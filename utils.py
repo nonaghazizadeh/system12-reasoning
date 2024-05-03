@@ -152,7 +152,7 @@ def compute_metrics(p):
 
 
 def load_ghc_data():
-    data_path = "../../../Data/GHC/"
+    data_path = "./data/GHC/"
 
     train_df = pd.read_csv(os.path.join(data_path , "train.csv")).dropna()
     val_df = pd.read_csv(os.path.join(data_path , "valid.csv")).dropna()
@@ -161,7 +161,7 @@ def load_ghc_data():
     # return pd.concat([train_df, val_df, test_df])
  
 def load_personal_attack_data():
-    data_path = "../../../Data/personal_attack/"
+    data_path = "./data/personal_attack/"
 
     train_df = pd.read_csv(os.path.join(data_path , "train.csv")).rename(columns={"comment":"text"}).dropna()
     val_df = pd.read_csv(os.path.join(data_path , "dev.csv")).rename(columns={"comment":"text"}).dropna()
@@ -171,7 +171,7 @@ def load_personal_attack_data():
 
 
 def load_ucc_data():
-    data_path = "../../../Data/ucc/"
+    data_path = "./data/ucc/"
 
     train_df = pd.read_csv(os.path.join(data_path , "train.csv")).rename(columns={"comment":"text"}).dropna()
     val_df = pd.read_csv(os.path.join(data_path , "dev.csv")).rename(columns={"comment":"text"}).dropna()
@@ -201,7 +201,7 @@ def load_jigsaw_data():
     return all_annotations_df
 
 def load_imdb_data():
-    data_path = "../../../Data/IMDB"
+    data_path = "./data/IMDB"
 
     train_df = pd.read_csv(os.path.join(data_path , "train.csv")).rename(columns={'review': 'text'})
     val_df = pd.read_csv(os.path.join(data_path , "valid.csv")).rename(columns={'review': 'text'})
@@ -215,16 +215,26 @@ def load_imdb_data():
 
 
 def load_agnews_data():
-    data_path = "../../../Data/AGNEWS"
+    data_path = "./data/AGNEWS"
 
     train_df = pd.read_csv(os.path.join(data_path , "train.csv"))
     val_df = pd.read_csv(os.path.join(data_path , "val.csv"))
     test_df = pd.read_csv(os.path.join(data_path , "test.csv"))
     return {"train":train_df, "val":val_df, "test":test_df}
 
+def load_system12_data():
+    data_path = "./data/system12"
+    label_mapping = {'System 1':0, 'System 2':1}
+    df = pd.read_csv(os.path.join(data_path , "Cognitive_Biases_Dataset.csv"))
+    df['labels'] = df['Strategy'].map(label_mapping)
+    return df
+    # return pd.concat([train_df, val_df, test_df])
+
 def get_dataset_loader_func(dataset_name):
     
-    if dataset_name == "personal_attack":
+    if dataset_name == 'system12':
+        return load_system12_data()
+    elif dataset_name == "personal_attack":
         return load_personal_attack_data()
     elif dataset_name == "imdb":
         return load_imdb_data()
