@@ -172,7 +172,8 @@ if __name__ == "__main__":
     wandb.init(project="system12", name=run_name, config=args)
 
     output_directory = os.path.join(
-        "experiments", f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}-{args.method}-{args.label_col}-{LM_name}")
+        "experiments", 'classifier', 
+        f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}-{args.method}-{args.label_col}-{LM_name}")
     os.mkdir(output_directory)
     logger = create_logger(output_directory)
     logger.info(args)

@@ -230,10 +230,23 @@ def load_system12_data():
     return df
     # return pd.concat([train_df, val_df, test_df])
 
+def load_system12_questions_data():
+    data_path = "./data/system12"
+    df = pd.read_csv(os.path.join(data_path , "Cognitive_Biases_Dataset.csv"))
+    df = pd.DataFrame(df['Question'].unique(), columns=['Question'])
+    return df
+
+def load_model_response(model_name):
+    data_path = f"./experiments/reponder/{model_name}"
+    df = pd.read_csv(os.path.join(data_path , "responses.csv"))
+    return df
+
 def get_dataset_loader_func(dataset_name):
     
     if dataset_name == 'system12':
         return load_system12_data()
+    elif dataset_name == 'system12_questions':
+        return load_system12_questions_data()
     elif dataset_name == "personal_attack":
         return load_personal_attack_data()
     elif dataset_name == "imdb":
@@ -246,6 +259,8 @@ def get_dataset_loader_func(dataset_name):
         return load_ghc_data()
     elif dataset_name == "ucc":
         return load_ucc_data()
+    else:
+        return load_model_response(dataset_name)
 
 def create_logger(save_path, log_level=logging.INFO):
     EXPERIMENT_DIRECTORY = save_path
