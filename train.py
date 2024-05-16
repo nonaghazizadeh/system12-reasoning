@@ -82,7 +82,9 @@ def setup_tokenizer(model_name_or_path):
         # outputs = tokenizer(examples["text"], truncation=True, max_length=400)
         # from IPython import embed; embed()
         # example['input'] = "[QUESTION] " + example['Question'] + " [ANSWER] " + example['Answer']
-        outputs = tokenizer(example['input'], truncation=True)
+
+        outputs = tokenizer(
+            example['input'], truncation=True)
         example["input_ids"] = outputs["input_ids"]
         example["attention_mask"] = outputs["attention_mask"]
         return example
@@ -159,6 +161,15 @@ def get_model(args):
     return model
 
 
+def add_pad_token_id(tokenizer, model):
+    if getattr(tokenizer, "pad_token_id") is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+    if getattr(model.config, "pad_token_id") is None:
+        model.config.pad_token_id = model.config.eos_token_id
+
+    return tokenizer, model
+
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -172,7 +183,7 @@ if __name__ == "__main__":
     wandb.init(project="system12", name=run_name, config=args)
 
     output_directory = os.path.join(
-        "experiments", 'classifier', 
+        "experiments", 'classifier',
         f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}-{args.method}-{args.label_col}-{LM_name}")
     os.mkdir(output_directory)
     logger = create_logger(output_directory)
@@ -209,9 +220,7 @@ if __name__ == "__main__":
 
     model.resize_token_embeddings(len(tokenizer))
 
-    if getattr(tokenizer, "pad_token_id") is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-        model.config.pad_token_id = model.config.eos_token_id
+    tokenizer, model = add_pad_token_id(tokenizer, model)
 
     training_args = TrainingArguments(
         output_dir=output_directory,
