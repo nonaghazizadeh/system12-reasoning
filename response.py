@@ -3,8 +3,8 @@ import os
 import torch
 import datetime
 from tqdm import tqdm
-from utils import create_logger, set_seed, get_dataset_loader_func
-from transformers import pipeline
+from utils import set_seed, get_dataset_loader_func
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 
 
 def create_prompt(question, system_content, user_first):
@@ -27,9 +27,8 @@ def create_prompt(question, system_content, user_first):
     return message
 
 
-def generate_response(text_generation_pipeline, df, user_first=False):
+def generate_response(text_generation_pipeline, df, system_content, user_first=False):
     responses = []
-    system_content = "Please answer the question in the simplest form."
     for idx, row in tqdm(df.iterrows()):
         question = row["Question"]
         messages = create_prompt(question, system_content, user_first)
@@ -44,14 +43,43 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--MAX_LEN", type=int, default=256,
                         help="Maximum sequence length")
-    parser.add_argument("--LM", type=str, default="roberta-large",
+    parser.add_argument("--LM", type=str, default="google/gemma-1.1-7b-it",
                         help="the pretrained language model to use")
-    parser.add_argument("--dataset_name", type=str, choices=["system12_questions"],
+    parser.add_argument("--dataset_name", type=str,
+                        choices=["system12_questions",
+                                 "system12_combined_questions",
+                                 "system12_gpt_questions"],
                         default="system12_questions", help="Questions to ask the language model")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
-
+    parser.add_argument("--system_prompt_format", type=str,
+                        choices=["simple", "short", "straightforward",
+                                 "annotator", "shortandsimple", "one-sentence"],
+                        default="simple", help="Questions to ask the language model")
     args = parser.parse_args()
     return args
+
+
+def get_pipeline(model_id):
+    if "Phi" in model_id:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            torch_dtype="auto",
+            trust_remote_code=True,
+        )
+        assert torch.cuda.is_available(), "This model needs a GPU to run ..."
+        device = torch.cuda.current_device()
+        model = model.to(device)
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        pipe = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            device=device
+        )
+    else:
+        pipe = pipeline("text-generation", model=args.LM, device_map="auto")
+
+    return pipe
 
 
 if __name__ == "__main__":
@@ -65,24 +93,34 @@ if __name__ == "__main__":
         LM_name = args.LM.split("/")[-1]
 
     output_directory = os.path.join(
-        "experiments", 'responder', f"{LM_name}")
-    os.mkdir(output_directory)
-    logger = create_logger(output_directory)
-    logger.info(args)
+        "experiments", 'responder', f"{LM_name}", args.dataset_name)
+    os.makedirs(output_directory, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    logger.info(f"Using {device} device")
 
     df = get_dataset_loader_func(args.dataset_name)
 
     # Initialize the pipeline for text generation
-    text_generation_pipeline = pipeline("text-generation", model=args.LM)
-    user_first = False
-    if 'Mistral' in args.LM or 'google' in args.LM:
-        user_first = True
+    text_generation_pipeline = get_pipeline(args.LM)
+    user_first = True
+    if 'Llama' in args.LM:
+        user_first = False
+
+    system_content_mapping = {
+        "simple": "Please answer the question in the simplest form.",
+        "short": "Please provide a brief response to the question.",
+        "straightforward": "Please respond to the question in the most straightforward manner possible",
+        "annotator": "Imagine you are an annotator and you need to answer the question.",
+        "shortandsimple": "Please provide a short and simple response to the question.",
+        "one-sentence": "Please provide a one-sentence response to the question.",
+    }
     # Generate responses
-    df = generate_response(text_generation_pipeline, df, user_first=user_first)
+    df = generate_response(text_generation_pipeline,
+                           df,
+                           system_content_mapping[args.system_prompt_format],
+                           user_first=user_first)
 
     # Save responses
-    df.to_csv(os.path.join(output_directory, "responses.csv"), index=False)
+    df.to_csv(os.path.join(output_directory,
+                           args.system_prompt_format + "_responses.csv"),
+              index=False)

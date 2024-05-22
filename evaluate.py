@@ -1,9 +1,8 @@
-import wandb
 import argparse
 import os
 import torch
-import datetime
-from utils import create_logger, set_seed, get_dataset_loader_func
+from tqdm import tqdm
+from utils import set_seed, get_dataset_loader_func
 from custom_datasets import CustomDataset
 from torch.utils.data.dataloader import DataLoader
 from transformers import (
@@ -53,7 +52,6 @@ def setup_tokenizer(model_name_or_path):
     def tokenize_function(example):
         # max_length=None => use the model's max length (it's actually the default)
         # outputs = tokenizer(examples["text"], truncation=True, max_length=400)
-        # from IPython import embed; embed()
         # example['input'] = "[QUESTION] " + example['Question'] + " [ANSWER] " + example['Answer']
 
         outputs = tokenizer(
@@ -70,7 +68,7 @@ def predict(model, dataloader, device):
     all_probs, all_preds = [], []
     model.to(device)
     model.eval()
-    for batch in dataloader:
+    for batch in tqdm(dataloader):
         # Move input tensors to the appropriate device (e.g., GPU)
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
@@ -103,10 +101,21 @@ def parse_args():
                         choices=['lora', 'finetune'],
                         help="the method to use for training")
     parser.add_argument("--LM_responder", type=str,
-                        choices=['gemma-1.1-7b-it', 'Meta-Llama-3-8B-Instruct',
-                                 'Mistral-7B-Instruct-v0.2'],
+                        choices=['gemma-1.1-7b-it',
+                                 'Meta-Llama-3-8B-Instruct',
+                                 'Mistral-7B-Instruct-v0.3', 'Mistral-7B-Instruct-v0.2',
+                                 'Phi-3-small-128k-instruct'],
                         default="gemma-1.1-7b-it", help="the dataset for training")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument("--system_prompt_format", type=str,
+                        choices=["simple", "short", "straightforward",
+                                 "annotator", "shortandsimple", "one-sentence"],
+                        default="simple", help="system prompt that we asked the question with.")
+    parser.add_argument("--dataset_name", type=str,
+                        choices=["system12_questions",
+                                 'system12_combined_questions',
+                                 "system12_gpt_questions"],
+                        default="system12_questions", help="Questions to ask the language model")
 
     args = parser.parse_args()
     return args
@@ -123,16 +132,10 @@ if __name__ == "__main__":
     model_directory = os.path.join(
         "experiments", 'classifier', args.LM_classifier_path)
     output_directory = os.path.join(
-        "experiments", 'responder', args.LM_responder)
-
-    logger = create_logger(output_directory, prefix="classifier_")
-    logger.info(args)
-    logger.info(f"Model directory: {model_directory}")
-    logger.info(f"Output directory: {output_directory}")
+        "experiments", 'responder', args.LM_responder, args.dataset_name)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    logger.info(f"Using {device} device")
 
     tokenizer, tokenize_function = setup_tokenizer(model_directory)
 
@@ -143,7 +146,8 @@ if __name__ == "__main__":
 
     tokenizer, model = add_pad_token_id(tokenizer, model)
 
-    df = get_dataset_loader_func(output_directory)
+    df = get_dataset_loader_func(os.path.join(output_directory,
+                                              args.system_prompt_format + "_responses.csv"))
 
     dataloader = create_dataloader(df=df,
                                    tokenize_function=tokenize_function)
@@ -153,4 +157,5 @@ if __name__ == "__main__":
     df['probabilities'] = results['probabilities']
     df['predictions'] = results['predictions']
 
-    df.to_csv(os.path.join(output_directory, "predictions.csv"), index=False)
+    df.to_csv(os.path.join(output_directory,
+                           args.system_prompt_format + "_predictions.csv"), index=False)

@@ -263,8 +263,39 @@ def load_system12_questions_data():
     return df
 
 
+def load_system12_10k_questions_data():
+    data_path = "./data/system12"
+    df = pd.read_csv(os.path.join(
+        data_path, "Cognitive_Biases_Dataset_10000_Examples.csv"))
+    df = pd.DataFrame(df['Question'].unique(), columns=['Question'])
+    return df
+
+
+def load_system12_gpt_questions_data():
+    data_path = "./data/system12"
+    df = pd.read_csv(os.path.join(
+        data_path, "gpt_Cognitive_Biases_Dataset.csv"))
+    df = pd.DataFrame(df['Question'].unique(), columns=['Question'])
+    return df
+
+
+def load_system12_combined_questions_data():
+    data_path = "./data/system12"
+    df = pd.read_csv(os.path.join(
+        data_path, "combined_cognitive_biases_dataset.csv"))
+    df = pd.DataFrame(df['Question'].unique(), columns=['Question'])
+    return df
+
+
+def load_system12_combined_data():
+    data_path = "./data/system12"
+    df = pd.read_csv(os.path.join(
+        data_path, "combined_cognitive_biases_dataset.csv"))
+    return df
+
+
 def load_model_response(data_path):
-    df = pd.read_csv(os.path.join(data_path, "responses.csv"))
+    df = pd.read_csv(data_path)
     return df
 
 
@@ -273,19 +304,27 @@ def get_dataset_loader_func(dataset_name):
     if dataset_name == 'system12':
         return load_system12_data()
     elif dataset_name == 'system12_questions':
-        return load_system12_questions_data()
-    elif dataset_name == "personal_attack":
-        return load_personal_attack_data()
-    elif dataset_name == "imdb":
-        return load_imdb_data()
-    elif dataset_name == "agnews":
-        return load_agnews_data()
-    elif dataset_name == "jigsaw_mola":
-        return load_jigsaw_data()
-    elif dataset_name == "ghc":
-        return load_ghc_data()
-    elif dataset_name == "ucc":
-        return load_ucc_data()
+        return load_system12_data()
+    elif dataset_name == 'system12_combined':
+        return load_system12_combined_data()
+    elif dataset_name == 'system12_combined_questions':
+        return load_system12_combined_questions_data()
+    elif dataset_name == 'system12_gpt_questions':
+        return load_system12_gpt_questions_data()
+    elif dataset_name == 'system12_10k_questions':
+        return load_system12_10k_questions_data()
+    # elif dataset_name == "personal_attack":
+    #     return load_personal_attack_data()
+    # elif dataset_name == "imdb":
+    #     return load_imdb_data()
+    # elif dataset_name == "agnews":
+    #     return load_agnews_data()
+    # elif dataset_name == "jigsaw_mola":
+    #     return load_jigsaw_data()
+    # elif dataset_name == "ghc":
+    #     return load_ghc_data()
+    # elif dataset_name == "ucc":
+    #     return load_ucc_data()
     else:
         return load_model_response(dataset_name)
 
