@@ -289,10 +289,11 @@ def load_system12_combined_questions_data():
 
 def load_system12_combined_data():
     data_path = "./data/system12"
+    label_mapping = {'System 1': 0, 'System 2': 1}
     df = pd.read_csv(os.path.join(
         data_path, "combined_cognitive_biases_dataset.csv"))
+    df['labels'] = df['Strategy'].map(label_mapping)
     return df
-
 
 def load_model_response(data_path):
     df = pd.read_csv(data_path)
