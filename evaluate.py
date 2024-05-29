@@ -101,10 +101,6 @@ def parse_args():
                         choices=['lora', 'finetune'],
                         help="the method to use for training")
     parser.add_argument("--LM_responder", type=str,
-                        choices=['gemma-1.1-7b-it',
-                                 'Meta-Llama-3-8B-Instruct',
-                                 'Mistral-7B-Instruct-v0.3', 'Mistral-7B-Instruct-v0.2',
-                                 'Phi-3-small-128k-instruct'],
                         default="gemma-1.1-7b-it", help="the dataset for training")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     parser.add_argument("--system_prompt_format", type=str,

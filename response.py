@@ -59,26 +59,25 @@ def parse_args():
     return args
 
 
-def get_pipeline(model_id):
-    if "Phi" in model_id:
+def get_pipeline(model_name_or_path, device):
+    # make sure that text generation pipeline is using AutoModelForCausalLM
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    if "Phi" in model_name_or_path:
         model = AutoModelForCausalLM.from_pretrained(
-            model_id,
+            model_name_or_path,
             torch_dtype="auto",
             trust_remote_code=True,
         )
-        assert torch.cuda.is_available(), "This model needs a GPU to run ..."
-        device = torch.cuda.current_device()
-        model = model.to(device)
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        pipe = pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            device=device
-        )
     else:
-        pipe = pipeline("text-generation", model=args.LM, device_map="auto")
-
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name_or_path,
+        )
+    pipe = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        device=device
+    )
     return pipe
 
 
@@ -101,7 +100,7 @@ if __name__ == "__main__":
     df = get_dataset_loader_func(args.dataset_name)
 
     # Initialize the pipeline for text generation
-    text_generation_pipeline = get_pipeline(args.LM)
+    text_generation_pipeline = get_pipeline(args.LM, device)
     user_first = True
     if 'Llama' in args.LM:
         user_first = False
