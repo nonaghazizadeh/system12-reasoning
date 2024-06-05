@@ -3,26 +3,38 @@ cd ..
 source venv/bin/activate
 
 label='labels'
-methods=('lora')
+method='lora'
 epochs=(20)
 learning_rate=8e-06
-gpu=0
-LM=('meta-llama/Meta-Llama-3-8B-Instruct')
+gpus=(7)
+LM=('google/gemma-7b')
 dataset_name="system12_combined"
 
-for method in "${methods[@]}"; do
-    for epoch in "${epochs[@]}"; do
-        for lm in "${LM[@]}"; do
-            echo "TRL $method with $lm on $label for $epoch epochs"
+for epoch in "${epochs[@]}"; do
+    for lm_index in "${!LM[@]}"; do
+        lm=${LM[$lm_index]}
+        gpu=${gpus[$lm_index]}
+        SESSION_NAME="${gpu}_TRL"
+        echo "[$gpu] $lm" 
+        screen -dmS "$SESSION_NAME" bash -c "
+        WANDB_PROJECT=system12_orpo CUDA_VISIBLE_DEVICES=$gpu python train_trl.py \
+                                                                --label_col "$label" \
+                                                                --LM "$lm" \
+                                                                --method "$method" \
+                                                                --EPOCHS "$epoch" \
+                                                                --LEARNING_RATE "$learning_rate" \
+                                                                --dataset_name "$dataset_name" \
+                                                                --reject_system_1;
+        exit"
 
-            WANDB_PROJECT=system12_orpo CUDA_VISIBLE_DEVICES=$gpu python train_trl.py \
-                                                                    --label_col "$label" \
-                                                                    --LM "$lm" \
-                                                                    --method "$method" \
-                                                                    --EPOCHS "$epoch" \
-                                                                    --LEARNING_RATE "$learning_rate" \
-                                                                    --dataset_name "$dataset_name"
-                                                                    # --reject_system_1
-        done
+        # screen -dmS "$SESSION_NAME" bash -c "
+        # WANDB_PROJECT=system12_orpo CUDA_VISIBLE_DEVICES=$gpu python train_trl.py \
+        #                                                         --label_col "$label" \
+        #                                                         --LM "$lm" \
+        #                                                         --method "$method" \
+        #                                                         --EPOCHS "$epoch" \
+        #                                                         --LEARNING_RATE "$learning_rate" \
+        #                                                         --dataset_name "$dataset_name";
+        # exit"
     done
 done
