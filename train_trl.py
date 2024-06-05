@@ -4,7 +4,7 @@ import os
 import torch
 import datetime
 from sklearn.model_selection import train_test_split
-from utils import create_logger, set_seed, get_dataset_loader_func
+from utils import create_logger, set_seed, get_dataset_loader_func, add_pad_token_id
 from datasets import Dataset as HFDataset
 from transformers import (
     AutoModelForCausalLM,
@@ -130,13 +130,6 @@ def get_model(args):
     return model
 
 
-def add_pad_token_id(tokenizer, model):
-    if getattr(tokenizer, "pad_token_id") is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-    if getattr(model.config, "pad_token_id") is None:
-        model.config.pad_token_id = model.config.eos_token_id
-
-    return tokenizer, model
 
 
 if __name__ == "__main__":
@@ -159,7 +152,7 @@ if __name__ == "__main__":
         output_directory += "-system2"
     else:
         output_directory += "-system1"
-    os.mkdir(output_directory)
+    os.makedirs(output_directory, exist_ok=True)
     logger = create_logger(output_directory)
     logger.info(args)
 

@@ -11,7 +11,7 @@ from transformers import (
     DataCollatorWithPadding,
 )
 from peft import PeftModel
-from train import add_pad_token_id
+from utils import add_pad_token_id
 
 
 def create_dataloader(df, tokenize_function):

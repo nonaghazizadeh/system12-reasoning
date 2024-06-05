@@ -368,3 +368,11 @@ def set_seed(seed: int) -> None:
 
     if torch.cuda.device_count() > 0:
         torch.cuda.manual_seed_all(seed)
+
+def add_pad_token_id(tokenizer, model):
+    if getattr(tokenizer, "pad_token_id") is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+    if getattr(model.config, "pad_token_id") is None:
+        model.config.pad_token_id = model.config.eos_token_id
+
+    return tokenizer, model

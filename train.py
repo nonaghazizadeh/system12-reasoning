@@ -5,7 +5,7 @@ import torch
 from torch.optim import AdamW
 import datetime
 from sklearn.model_selection import train_test_split
-from utils import compute_metrics, create_logger, set_seed, get_dataset_loader_func
+from utils import compute_metrics, create_logger, set_seed, get_dataset_loader_func, add_pad_token_id
 from datasets import Dataset as HFDataset
 from transformers import (
     AutoModelForSequenceClassification,
@@ -159,15 +159,6 @@ def get_model(args):
         model.print_trainable_parameters()
 
     return model
-
-
-def add_pad_token_id(tokenizer, model):
-    if getattr(tokenizer, "pad_token_id") is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-    if getattr(model.config, "pad_token_id") is None:
-        model.config.pad_token_id = model.config.eos_token_id
-
-    return tokenizer, model
 
 
 if __name__ == "__main__":
