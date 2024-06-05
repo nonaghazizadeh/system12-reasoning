@@ -1,10 +1,8 @@
 import argparse
 import os
 import torch
-import datetime
 from tqdm import tqdm
-from utils import set_seed, get_dataset_loader_func
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
+from utils import set_seed, get_dataset_loader_func, get_pipeline
 
 
 def create_prompt(question, system_content, user_first):
@@ -57,29 +55,6 @@ def parse_args():
                         default="simple", help="Questions to ask the language model")
     args = parser.parse_args()
     return args
-
-
-def get_pipeline(model_name_or_path, device):
-    # make sure that text generation pipeline is using AutoModelForCausalLM
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-    if "Phi" in model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
-            torch_dtype="auto",
-            trust_remote_code=True,
-        )
-    else:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
-        )
-    pipe = pipeline(
-        "text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        device=device
-    )
-    return pipe
-
 
 if __name__ == "__main__":
     args = parse_args()
