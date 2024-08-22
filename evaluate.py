@@ -11,7 +11,7 @@ from transformers import (
     DataCollatorWithPadding,
 )
 from peft import PeftModel
-from utils import add_pad_token_id
+from utils import add_pad_token_id, get_tokenizer
 
 
 def create_dataloader(df, tokenize_function):
@@ -41,13 +41,7 @@ def load_model(model, model_path, method):
 
 
 def setup_tokenizer(model_name_or_path):
-    if any(k in model_name_or_path for k in ("gpt", "opt", "bloom")):
-        padding_side = "left"
-    else:
-        padding_side = "right"
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path, padding_side=padding_side)
+    tokenizer = get_tokenizer(model_name_or_path)
 
     def tokenize_function(example):
         # max_length=None => use the model's max length (it's actually the default)

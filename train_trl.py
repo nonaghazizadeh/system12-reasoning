@@ -2,9 +2,8 @@ import wandb
 import argparse
 import os
 import torch
-import datetime
 from sklearn.model_selection import train_test_split
-from utils import create_logger, set_seed, get_dataset_loader_func, add_pad_token_id
+from utils import create_logger, set_seed, get_dataset_loader_func, add_pad_token_id, get_tokenizer
 from datasets import Dataset as HFDataset
 from transformers import (
     AutoModelForCausalLM,
@@ -56,18 +55,6 @@ def create_feedback_datasets(df, seed, label_col, train_size=0.8, reject_system_
     test_dataset = HFDataset.from_pandas(test_df)
 
     return train_dataset, val_dataset, test_dataset
-
-
-def get_tokenizer(model_name_or_path):
-    if any(k in model_name_or_path for k in ("gpt", "opt", "bloom")):
-        padding_side = "left"
-    else:
-        padding_side = "right"
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path, padding_side=padding_side)
-
-    return tokenizer
 
 
 def parse_args():

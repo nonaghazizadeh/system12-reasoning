@@ -12,7 +12,6 @@ from copy import deepcopy
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 
-
 dataset2label = {
     "personal": ["tpa", "oa", "ra"],
     "ucc": ["antagonize", "condescending", "hostile"],
@@ -298,6 +297,7 @@ def load_system12_combined_data():
     df['labels'] = df['Strategy'].map(label_mapping)
     return df
 
+
 def load_model_response(data_path):
     df = pd.read_csv(data_path)
     return df
@@ -372,6 +372,7 @@ def set_seed(seed: int) -> None:
     if torch.cuda.device_count() > 0:
         torch.cuda.manual_seed_all(seed)
 
+
 def add_pad_token_id(tokenizer, model):
     if getattr(tokenizer, "pad_token_id") is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -427,7 +428,6 @@ class LocalDecoder():
         for response in responses:
             content.append(response[0]['generated_text'][-1]['content'])
         return content
-
 
 
 def answer_cleansing(args, preds):
@@ -585,3 +585,15 @@ def create_logger(save_path, log_level=logging.INFO, prefix=""):
     logger.addHandler(file_handler)
 
     return logger
+
+
+def get_tokenizer(model_name_or_path):
+    if any(k in model_name_or_path.lower() for k in ("gemma", "llama", "gpt", "opt", "bloom")):
+        padding_side = "left"
+    else:
+        padding_side = "right"
+    print(f"Padding side: {padding_side}")
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name_or_path, padding_side=padding_side)
+
+    return tokenizer

@@ -5,7 +5,14 @@ import torch
 from torch.optim import AdamW
 import datetime
 from sklearn.model_selection import train_test_split
-from utils import compute_metrics, create_logger, set_seed, get_dataset_loader_func, add_pad_token_id
+from utils import (
+    compute_metrics,
+    create_logger,
+    set_seed,
+    get_dataset_loader_func,
+    add_pad_token_id,
+    get_tokenizer
+)
 from datasets import Dataset as HFDataset
 from transformers import (
     AutoModelForSequenceClassification,
@@ -69,13 +76,7 @@ def get_datasets(df, seed, tokenize_function, label_col, train_size=0.8):
 
 
 def setup_tokenizer(model_name_or_path):
-    if any(k in model_name_or_path for k in ("gpt", "opt", "bloom")):
-        padding_side = "left"
-    else:
-        padding_side = "right"
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path, padding_side=padding_side)
+    tokenizer = get_tokenizer(model_name_or_path)
 
     def tokenize_function(example):
         # max_length=None => use the model's max length (it's actually the default)
