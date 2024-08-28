@@ -16,7 +16,6 @@ from utils import (
 from datasets import Dataset as HFDataset
 from transformers import (
     AutoModelForSequenceClassification,
-    AutoTokenizer,
     DataCollatorWithPadding,
     TrainingArguments,
     Trainer,

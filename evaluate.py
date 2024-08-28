@@ -6,7 +6,6 @@ from utils import set_seed, get_dataset_loader_func
 from custom_datasets import CustomDataset
 from torch.utils.data.dataloader import DataLoader
 from transformers import (
-    AutoTokenizer,
     AutoModelForSequenceClassification,
     DataCollatorWithPadding,
 )
