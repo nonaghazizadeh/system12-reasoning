@@ -3,22 +3,39 @@
 cd .. 
 source venv/bin/activate
 
-gpu=7
 lm="meta-llama/Meta-Llama-3.1-8B-Instruct"
-
-system_12_folder="data/system_12_from_instruction_tunning"
-
 data_dir="data/processed_instruction_tunning"
-dataset_files=("$data_dir/flan_v2/flan_v2_data.jsonl"
-    "$data_dir/cot/cot_data.jsonl"
-    "$data_dir/dolly/dolly_data.jsonl"
-    "$data_dir/oasst1/oasst1_data.jsonl")
+output_data_dir="data/system12_instruction_tunning"
+
+dataset_files=(
+    "flan_v2/flan_v2_data_exclude_long.jsonl"
+    "cot/cot_data.jsonl"
+    "dolly/dolly_data.jsonl"
+    "oasst1/oasst1_data.jsonl"
+)
+gpus=(4 5 6 7)
+
+dataset_files=(
+    "flan_v2/flan_v2_data_exclude_long.jsonl"
+)
+gpus=(6)
 
 sample_size=0
 
+for i in "${!dataset_files[@]}"; do
+    dataset="${dataset_files[$i]}"
+    gpu=${gpus[$i]}
+    dataset_name="${dataset%%/*}"
+    output_folder="$output_data_dir/${dataset_name}_system12"
 
-CUDA_VISIBLE_DEVICES=$gpu python zero_shot.py \
-                                --model_name $lm \
-                                --system_12_folder $system_12_folder \
-                                --dataset_files ${dataset_files[@]} \
-                                --sample_size $sample_size ;
+    echo "Processing $dataset_name on GPU $gpu"
+    
+    # Create a new screen session for each dataset
+    screen -dmS "zero_shot_${dataset_name}" bash -c "
+        CUDA_VISIBLE_DEVICES=$gpu python zero_shot.py \
+            --model_name $lm \
+            --system_12_folder $output_folder \
+            --dataset_files \"$data_dir/$dataset\" \
+            --sample_size $sample_size
+    "
+done

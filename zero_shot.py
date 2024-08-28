@@ -2,8 +2,7 @@ import os
 import torch
 import argparse
 from datasets import load_dataset, Dataset
-from transformers.pipelines.pt_utils import KeyDataset
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers import AutoModelForCausalLM, pipeline
 from tqdm.auto import tqdm
 from utils import add_pad_token_id, get_tokenizer
 
@@ -42,51 +41,103 @@ def add_prompt(example):
     return example
 
 
-def separate_datasets(dataset, pipe, batch_size=2):
+def model_api(prompt, pipe):
+    response = pipe(prompt, max_new_tokens=10)
+    clean_response = response[0]['generated_text'][-1]['content'].strip().lower()
+    return clean_response
+
+
+def separate_datasets(dataset, pipe, start_index=0, cache_size=100):
     system1_data, system2_data = [], []
-    for data in tqdm(dataset['train']):
-        response = pipe(data['prompt'], max_new_tokens=10)
-        clean_response = response[0]['generated_text'][-1]['content'].strip().lower()
-        if clean_response == "system 1":
+    for index in tqdm(range(start_index, len(dataset['train']))):
+        data = dataset['train'][index]
+        response = model_api(prompt=data['prompt'], pipe=pipe)
+        if response == "system 1":
             system1_data.append(data)
-        elif clean_response == "system 2":
+        elif response == "system 2":
             system2_data.append(data)
         else:
-            print(f"Error: {clean_response}")
+            print(f"Error: {response}")
 
-    return system1_data, system2_data
+        if (index + 1) % cache_size == 0:
+            print(f"Saving datasets at length of {index + 1}")
+            create_and_save_datasets(
+                system1_data, system2_data, args.system_12_folder, index + 1)
+            system1_data, system2_data = [], []
+
+    create_and_save_datasets(system1_data, system2_data, args.system_12_folder)
+    combine_and_remove_cache_datasets(args.system_12_folder)
 
 
-def create_and_save_datasets(system1_data, system2_data, system_12_folder):
-    system1_dataset = Dataset.from_list(
-        system1_data).remove_columns(['prompt'])
-    system2_dataset = Dataset.from_list(
-        system2_data).remove_columns(['prompt'])
+def combine_and_remove_cache_datasets(system_12_folder):
+    files = os.listdir(system_12_folder)
+    system1_files = [os.path.join(system_12_folder, file)
+                     for file in files if file.startswith("system1_")]
+    system2_files = [os.path.join(system_12_folder, file)
+                     for file in files if file.startswith("system2_")]
 
-    print(f"System 1 dataset size: {len(system1_dataset)}")
-    print(f"System 2 dataset size: {len(system2_dataset)}")
+    system_1_dataset = load_dataset("json", data_files=system1_files)
+    system_2_dataset = load_dataset("json", data_files=system2_files)
 
-    system1_dataset.to_json(os.path.join(
-        system_12_folder, "system1_dataset.jsonl"), lines=True)
-    system2_dataset.to_json(os.path.join(
-        system_12_folder, "system2_dataset.jsonl"), lines=True)
+    system_1_dataset['train'].to_json(os.path.join(
+        system_12_folder, "system1.jsonl"), lines=True)
+    system_2_dataset['train'].to_json(os.path.join(
+        system_12_folder, "system2.jsonl"), lines=True)
+
+    for file in files:
+        os.remove(os.path.join(system_12_folder, file))
+
+
+def create_and_save_dataset(data, file):
+    if len(data) == 0:
+        return
+    dataset = Dataset.from_list(data).remove_columns(['prompt'])
+    dataset.to_json(file, lines=True)
+
+
+def create_and_save_datasets(system1_data, system2_data, system_12_folder, start_index=-1):
+    create_and_save_dataset(system1_data, os.path.join(
+        system_12_folder, f"system1_{start_index}.jsonl"))
+    create_and_save_dataset(system2_data, os.path.join(
+        system_12_folder, f"system2_{start_index}.jsonl"))
+
+    print(f"System 1 dataset size: {len(system1_data)}")
+    print(f"System 2 dataset size: {len(system2_data)}")
+
+
+def get_start_index(system_12_folder):
+    files = os.listdir(system_12_folder)
+    if len(files) == 0:
+        return 0
+
+    indcies = [int(file.split("_")[-1].split(".")[0]) for file in files]
+    return max(indcies)
+
+
+def check_done(system_12_folder):
+    system1_file = os.path.join(system_12_folder, "system1.jsonl")
+    system2_file = os.path.join(system_12_folder, "system2.jsonl")
+    return os.path.exists(system1_file) and os.path.exists(system2_file)
 
 
 def main(args):
     os.makedirs(args.system_12_folder, exist_ok=True)
+    start_index = get_start_index(args.system_12_folder)
+    if check_done(args.system_12_folder):
+        print("Already done")
+        return
 
     dataset = load_dataset("json", data_files=args.dataset_files)
     if args.sample_size > 0:
         dataset['train'] = dataset['train'].select(range(args.sample_size))
     dataset = dataset.map(add_prompt)
-    print(f"Dataset size: {len(dataset['train'])}")
+    print(f"Dataset size: {len(dataset['train'])}, start index: {start_index}")
 
     model, tokenizer = load_model_and_tokenizer(args.model_name)
     pipe = pipeline("text-generation", model=model, tokenizer=tokenizer,
                     device="cuda" if torch.cuda.is_available() else "cpu")
 
-    system1_data, system2_data = separate_datasets(dataset, pipe)
-    create_and_save_datasets(system1_data, system2_data, args.system_12_folder)
+    separate_datasets(dataset, pipe, start_index)
 
 
 if __name__ == "__main__":
