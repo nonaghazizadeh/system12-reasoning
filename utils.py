@@ -364,15 +364,6 @@ def create_logger(save_path, log_level=logging.INFO, prefix=""):
     return logger
 
 
-def set_seed(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-    if torch.cuda.device_count() > 0:
-        torch.cuda.manual_seed_all(seed)
-
-
 def add_pad_token_id(tokenizer, model):
     if getattr(tokenizer, "pad_token_id") is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id

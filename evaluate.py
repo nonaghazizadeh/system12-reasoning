@@ -2,12 +2,13 @@ import argparse
 import os
 import torch
 from tqdm import tqdm
-from utils import set_seed, get_dataset_loader_func
+from utils import get_dataset_loader_func
 from custom_datasets import CustomDataset
 from torch.utils.data.dataloader import DataLoader
 from transformers import (
     AutoModelForSequenceClassification,
     DataCollatorWithPadding,
+    set_seed
 )
 from peft import PeftModel
 from utils import add_pad_token_id, get_tokenizer
@@ -124,7 +125,6 @@ if __name__ == "__main__":
         "experiments", 'responder', args.LM_responder, args.dataset_name)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
     tokenizer, tokenize_function = setup_tokenizer(model_directory)
 

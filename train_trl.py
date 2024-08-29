@@ -3,11 +3,11 @@ import argparse
 import os
 import torch
 from sklearn.model_selection import train_test_split
-from utils import create_logger, set_seed, get_dataset_loader_func, add_pad_token_id, get_tokenizer
+from utils import create_logger, get_dataset_loader_func, add_pad_token_id, get_tokenizer
 from datasets import Dataset as HFDataset
 from transformers import (
     AutoModelForCausalLM,
-    AutoTokenizer,
+    set_seed,
 )
 from trl import (
     ORPOConfig,

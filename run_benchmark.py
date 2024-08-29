@@ -4,8 +4,9 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils import set_seed, create_logger, LocalDecoder, answer_cleansing
+from utils import create_logger, LocalDecoder, answer_cleansing
 from custom_datasets import BenchmarkDataset
+from transformers import set_seed
 
 
 def main():

@@ -2,7 +2,8 @@ import argparse
 import os
 import torch
 from tqdm import tqdm
-from utils import set_seed, get_dataset_loader_func, get_pipeline
+from utils import get_dataset_loader_func, get_pipeline
+from transformers import set_seed
 
 
 def create_prompt(question, system_content, user_first):
