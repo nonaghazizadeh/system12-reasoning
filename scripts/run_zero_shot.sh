@@ -26,7 +26,7 @@ for i in "${!dataset_files[@]}"; do
     dataset="${dataset_files[$i]}"
     gpu=${gpus[$i]}
     dataset_name="${dataset%%/*}"
-    output_folder="$output_data_dir/${dataset_name}_system12"
+    output_folder="$output_data_dir/${dataset_name}"
 
     echo "Processing $dataset_name on GPU $gpu"
     
