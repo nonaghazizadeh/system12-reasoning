@@ -10,18 +10,14 @@ thinking_type=$2
 sample_size=$3
 
 model_path="meta-llama/Meta-Llama-3.1-8B"
-data_seed=42
+seed=42
+eval_sample_size=1000
 
 data_dir=./data/system12_instruction_tunning
 
 
-output_dir=./experiments/instruction_tunning/${thinking_type}
-if [[ $thinking_type == "system12" ]]; then
-    output_dir=./experiments/instruction_tunning/${thinking_type}_${sample_size}
-fi
-if [[ ! -d $output_dir ]]; then
-    mkdir -p $output_dir
-fi
+output_dir=./experiments/instruction_tunning/${thinking_type}_${sample_size}
+mkdir -p "$output_dir"
 
 train_files=("$data_dir/flan_v2/"
     "$data_dir/cot/"
@@ -42,8 +38,13 @@ training_args="$base_training_args \
 --model_name_or_path $model_path \
 --output_dir $output_dir \
 --sample_size $sample_size \
---data_seed $data_seed \
+--eval_sample_size $eval_sample_size \
+--seed $seed \
+--thinking_type $thinking_type \
 --train_files ${train_files[@]} 2>&1 | tee $output_dir/train.log"
+
+export WANDB_PROJECT=instruction-tunning
+export WANDB_NAME="${thinking_type}_${sample_size}"
 
 SESSION_NAME="${thinking_type}_${sample_size}_gpu_${gpu}"
 echo "Starting session $SESSION_NAME"

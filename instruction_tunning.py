@@ -93,31 +93,47 @@ def encode_with_messages_format(example, tokenizer, max_seq_length):
     }
 
 
-def get_training_dataset(thinking_type: str,
-                         train_files: List[str],
-                         tokenizer,
-                         max_seq_length,
-                         sample_size=10000,
-                         seed=0):
-    """ get training dataset with a specified seed """
-    if thinking_type == "system_12":
-        dataset_list = []
+def get_datasets(thinking_type: str,
+                 train_files: List[str],
+                 tokenizer,
+                 max_seq_length,
+                 sample_size=10000,
+                 eval_sample_size=5000,
+                 seed=0):
+    """ get datasets with a specified seed """
+    if thinking_type == "system12":
+        dataset_list, eval_dataset_list = [], []
+        sample_size, eval_sample_size = sample_size // 2, eval_sample_size // 2
         for tp in ['system1', 'system2']:
-            train_files = [os.path.join(
+            tp_files = [os.path.join(
                 file, f"{tp}.jsonl") for file in train_files]
-            dataset = datasets.load_dataset(
-                "json", data_files=train_files, split="train")
-            dataset = dataset.shuffle(seed=seed)
-            dataset = dataset.select(range(sample_size))
+            raw_dataset = datasets.load_dataset(
+                "json", data_files=tp_files, split="train")
+            raw_dataset = raw_dataset.shuffle(seed=seed)
+            dataset = raw_dataset.select(range(sample_size))
+            eval_dataset = raw_dataset.select(
+                range(sample_size, sample_size + eval_sample_size))
             dataset_list.append(dataset)
+            eval_dataset_list.append(eval_dataset)
+            logger.info(
+                f"{tp} training dataset: {len(dataset)} from {len(raw_dataset)}")
+            logger.info(
+                f"{tp} eval dataset: {len(eval_dataset)} from {len(raw_dataset)}")
         dataset = datasets.concatenate_datasets(dataset_list)
+        eval_dataset = datasets.concatenate_datasets(eval_dataset_list)
     else:
         train_files = [os.path.join(
             file, f"{thinking_type}.jsonl") for file in train_files]
-        dataset = datasets.load_dataset(
+        raw_dataset = datasets.load_dataset(
             "json", data_files=train_files, split="train")
-        dataset = dataset.shuffle(seed=seed)
-        dataset = dataset.select(range(sample_size))
+        raw_dataset = raw_dataset.shuffle(seed=seed)
+        dataset = raw_dataset.select(range(sample_size))
+        eval_dataset = raw_dataset.select(
+            range(sample_size, sample_size + eval_sample_size))
+        logger.info(
+            f"{thinking_type} training dataset: {len(dataset)} from {len(raw_dataset)}")
+        logger.info(
+            f"{thinking_type} eval dataset: {len(eval_dataset)} from {len(raw_dataset)}")
 
     encode_function = partial(
         encode_with_messages_format,
@@ -129,10 +145,17 @@ def get_training_dataset(thinking_type: str,
                           batched=False,
                           num_proc=10,
                           load_from_cache_file=True,
-                          desc="Tokenizing and reformatting instruction data",
+                          desc="Tokenizing and reformatting instruction training data",
                           )
+    eval_dataset = eval_dataset.map(encode_function,
+                                    batched=False,
+                                    num_proc=10,
+                                    load_from_cache_file=True,
+                                    desc="Tokenizing and reformatting instruction evaluation data",
+                                    )
     dataset.set_format(type="pt")
-    return dataset
+    eval_dataset.set_format(type="pt")
+    return dataset, eval_dataset
 
 
 def main():
@@ -176,20 +199,23 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     # Load training dataset
-    train_dataset = get_training_dataset(thinking_type=data_args.thinking_type,
-                                         train_files=data_args.train_files,
-                                         tokenizer=tokenizer,
-                                         max_seq_length=data_args.max_seq_length,
-                                         sample_size=data_args.sample_size,
-                                         seed=data_args.sample_data_seed)
+    train_dataset, eval_dataset = get_datasets(thinking_type=data_args.thinking_type,
+                                               train_files=data_args.train_files,
+                                               tokenizer=tokenizer,
+                                               max_seq_length=data_args.max_seq_length,
+                                               sample_size=data_args.sample_size,
+                                               eval_sample_size=data_args.eval_sample_size,
+                                               seed=training_args.seed)
 
     model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path, torch_dtype=model_args.torch_dtype, attn_implementation="flash_attention_2",)
+        model_args.model_name_or_path, torch_dtype=model_args.torch_dtype)
     add_padding_to_tokenizer(tokenizer)
 
     # resize embeddings if needed (e.g. for LlamaTokenizer)
     embedding_size = model.get_input_embeddings().weight.shape[0]
     if len(tokenizer) > embedding_size:
+        logger.info(
+            f"Resizing embedding size from {embedding_size} to {len(tokenizer)}")
         model.resize_token_embeddings(len(tokenizer), pad_to_multiple_of=8)
         # if you load lora model and resize the token embeddings, the requires_grad flag is set to True for embeddings
         if isinstance(model, PeftModel):
@@ -218,6 +244,7 @@ def main():
             def make_inputs_require_grad(module, input, output):
                 output.requires_grad_(True)
             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+        training_args.save_embedding_layers = True
 
     get_data_statistics(train_dataset)
 
@@ -233,7 +260,7 @@ def main():
     #                    for p in model.parameters() if p.requires_grad)
     # logger.info(f"trainable model_params: {model_params}")
 
-    analysis_dataset = None
+    # analysis_dataset = None
     # if training_args.analysis_mode:
     #     from less.data_selection.get_validation_dataset import get_dataset
     #     analysis_dataset = get_dataset(training_args.analysis_dataset,
@@ -241,25 +268,16 @@ def main():
     #                                    tokenizer=tokenizer,
     #                                    max_length=data_args.max_seq_length)
 
-    # for testing if the model can go through full length
-    # import torch
-    # from datasets import Dataset
-
-    # input_ids = [torch.randint(0, 32000, (2048, )) for _ in range(10000)]
-    # attention_mask = [torch.ones(2048, ) for _ in range(10000)]
-    # train_dataset = Dataset.from_dict({"input_ids": input_ids, "labels": input_ids, "attention_mask": attention_mask})
-
     # if dist.is_initialized() and dist.get_rank() == 0:
     #     print(model)
     # elif not dist.is_initialized():
     #     print(model)
-    torch.cuda.empty_cache()
 
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=analysis_dataset,
+        eval_dataset=eval_dataset,
         tokenizer=tokenizer,
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer, model=model, padding="longest")
@@ -267,7 +285,18 @@ def main():
 
     # Training
     train_result = trainer.train()
-    trainer.save_model()  # Saves the tokenizer too for easy upload
+
+    # Get the best model from the trainer if load_best_model_at_end is True
+    model = trainer.model
+
+    # Create the directory if it doesn't exist
+    best_model_output_dir = os.path.join(
+        training_args.output_dir, "best_model")
+    os.makedirs(best_model_output_dir, exist_ok=True)
+
+    # Save the model and tokenizer in output_dir/best_model
+    model.save_pretrained(best_model_output_dir, save_embedding_layers=True)
+    tokenizer.save_pretrained(best_model_output_dir)
 
     metrics = train_result.metrics
 
