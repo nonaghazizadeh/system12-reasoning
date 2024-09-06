@@ -35,11 +35,11 @@ class DataArguments:
             "help": ("The maximum total input sequence length after tokenization. Sequences longer than this will be truncated,")
         },
     )
-    sample_data_seed: int = field(
-        default=42, metadata={"help": ("The seed used for data sampling.")},
-    )
     sample_size: int = field(
         default=10000, metadata={"help": ("Sampling size for all dataset")},
+    )
+    eval_sample_size: int = field(
+        default=5000, metadata={"help": ("Sampling size for all dataset")},
     )
 
 
