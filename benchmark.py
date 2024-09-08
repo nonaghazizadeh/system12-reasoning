@@ -15,6 +15,9 @@ def main():
                                     args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
     csv_file = os.path.join(output_directory, "result.csv")
+    if os.path.exists(csv_file):
+        logger.info(f"CSV file {csv_file} already exists. Skipping benchmark.")
+        return
     logger = create_logger(output_directory)
     logger.info('*****************************')
     logger.info(args)
