@@ -10,7 +10,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_sco
 from transformers import TrainerCallback
 from copy import deepcopy
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-
+from peft import PeftModel, PeftConfig
 
 dataset2label = {
     "personal": ["tpa", "oa", "ra"],
@@ -419,6 +419,60 @@ class LocalDecoder():
         for response in responses:
             content.append(response[0]['generated_text'][-1]['content'])
         return content
+
+
+class InstructionTunedDecoder():
+    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
+        model_name_or_path = model_name_or_path + "/best_model"
+        tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        peft_config = PeftConfig.from_pretrained(model_name_or_path)
+
+        model = AutoModelForCausalLM.from_pretrained(
+            peft_config.base_model_name_or_path)
+        model.resize_token_embeddings(len(tokenizer), pad_to_multiple_of=8)
+        model = PeftModel.from_pretrained(model, model_name_or_path)
+        model = model.merge_and_unload()
+        self.pipeline = pipeline(
+            "text-generation", model=model, tokenizer=tokenizer, device=device)
+
+        self.MAX_LEN = MAX_LEN
+
+    def decode(self, inputs):
+        conversations = []
+        for input in inputs:
+            conversation = [{"role": "user", "content": input}]
+            conversation = concat_messages(
+                conversation, self.pipeline.tokenizer, add_assistant_in_the_end=True)
+            conversations.append(conversation)
+        # conversation = [{"role": "user", "content": input}]
+        responses = self.pipeline(conversations,
+                                  max_new_tokens=self.MAX_LEN,
+                                  #  batch_size=self.batch_size,
+                                  #  padding='longest'
+                                  )
+        content = []
+        for response in responses:
+            content.append(response[0]['generated_text'].split(
+                "<|assistant|>\n")[-1])
+        return content
+
+
+def concat_messages(messages, tokenizer, add_assistant_in_the_end=False):
+    message_text = ""
+    for message in messages:
+        if message["role"] == "system":
+            message_text += "<|system|>\n" + message["content"].strip() + "\n"
+        elif message["role"] == "user":
+            message_text += "<|user|>\n" + message["content"].strip() + "\n"
+        elif message["role"] == "assistant":
+            message_text += "<|assistant|>\n" + \
+                message["content"].strip() + tokenizer.eos_token + "\n"
+        else:
+            raise ValueError("Invalid role: {}".format(message["role"]))
+
+    if add_assistant_in_the_end:
+        message_text += "<|assistant|>\n"
+    return message_text
 
 
 def answer_cleansing(args, preds):

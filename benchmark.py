@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils import create_logger, LocalDecoder, answer_cleansing
+from utils import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
 from custom_datasets import BenchmarkDataset
 from transformers import set_seed
 
@@ -32,8 +32,13 @@ def main():
     # decoder = Decoder(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    decoder = LocalDecoder(model_name_or_path=args.model,
-                           batch_size=args.batch_size, device=device)
+    if "instruction_tunning" in args.model:
+        print()
+        decoder = InstructionTunedDecoder(model_name_or_path=args.model,
+                                          batch_size=args.batch_size, device=device)
+    else:
+        decoder = LocalDecoder(model_name_or_path=args.model,
+                               batch_size=args.batch_size, device=device)
 
     # print("setup data loader ...")
     logger.info("setup data loader ...")
