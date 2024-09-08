@@ -7,7 +7,6 @@ from functools import partial
 from typing import List
 
 import datasets
-import torch.distributed as dist
 import transformers
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
 from transformers import (AutoModelForCausalLM,
@@ -20,25 +19,13 @@ from transformers import (AutoModelForCausalLM,
 from data_arguments import DataArguments, get_data_statistics
 from model_arguments import ModelArguments, add_padding_to_tokenizer
 from training_arguments import TrainingArguments
+from utils import concat_messages
+
 
 logger = logging.getLogger(__name__)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-
-def concat_messages(messages, tokenizer):
-    message_text = ""
-    for message in messages:
-        if message["role"] == "system":
-            message_text += "<|system|>\n" + message["content"].strip() + "\n"
-        elif message["role"] == "user":
-            message_text += "<|user|>\n" + message["content"].strip() + "\n"
-        elif message["role"] == "assistant":
-            message_text += "<|assistant|>\n" + \
-                message["content"].strip() + tokenizer.eos_token + "\n"
-        else:
-            raise ValueError("Invalid role: {}".format(message["role"]))
-    return message_text
 
 
 def encode_with_messages_format(example, tokenizer, max_seq_length):
