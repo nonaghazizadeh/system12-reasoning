@@ -291,9 +291,9 @@ def load_system12_combined_questions_data():
 
 def load_system12_combined_data():
     data_path = "./data/system12"
-    label_mapping = {'System 1': 0, 'System 2': 1}
+    label_mapping = {'system1': 0, 'system2': 1}
     df = pd.read_csv(os.path.join(
-        data_path, "combined_cognitive_biases_dataset.csv"))
+        data_path, "cogbias.csv"))
     df['labels'] = df['Strategy'].map(label_mapping)
     return df
 
@@ -375,7 +375,7 @@ def add_pad_token_id(tokenizer, model):
 
 def get_pipeline(model_name_or_path, device):
     # make sure that text generation pipeline is using AutoModelForCausalLM
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained('meta-llama/Meta-Llama-3-8B-Instruct')
     if "Phi" in model_name_or_path:
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
@@ -388,6 +388,7 @@ def get_pipeline(model_name_or_path, device):
         )
 
     tokenizer, model = add_pad_token_id(tokenizer, model)
+    # Check if the model requires a chat template
 
     pipe = pipeline(
         "text-generation",
@@ -404,10 +405,12 @@ class LocalDecoder():
         # self.batch_size = batch_size
         self.MAX_LEN = MAX_LEN
 
+
     def decode(self, inputs):
         conversations = []
         for input in inputs:
-            conversation = [{"role": "user", "content": input}]
+            conversation = [
+                {"role": "user", "content": input}]
             conversations.append(conversation)
         # conversation = [{"role": "user", "content": input}]
         responses = self.pipeline(conversations,
@@ -640,5 +643,6 @@ def get_tokenizer(model_name_or_path):
     print(f"Padding side: {padding_side}")
     tokenizer = AutoTokenizer.from_pretrained(
         model_name_or_path, padding_side=padding_side)
+    print(tokenizer)
 
     return tokenizer
