@@ -10,8 +10,8 @@ from transformers import (
     set_seed,
 )
 from trl import (
-    ORPOConfig,
-    ORPOTrainer,
+    DPOConfig,
+    DPOTrainer,
 )
 from peft import (
     get_peft_model,
@@ -118,16 +118,16 @@ if __name__ == "__main__":
         LM_name = args.LM.split("/")[-1]
     run_name = f"{args.method}-{args.label_col}-{args.LM}-{args.seed}"
 
-    wandb.init(project="system12_orpo", name=run_name, config=args)
+    wandb.init(project="system12-dpo", name=run_name, config=args)
 
     
     output_directory = os.path.join(
-        "experiments", 'orpo',
+        "experiments", 'dpo-instruct',
         f"{args.method}-{LM_name}")
     if args.reject_system_1:
-        output_directory += "-system2"
+        output_directory += "-system2-10"
     else:
-        output_directory += "-system1"
+        output_directory += "-system1-10"
     os.makedirs(output_directory, exist_ok=True)
     logger = create_logger(output_directory)
     logger.info(args)
@@ -147,8 +147,8 @@ if __name__ == "__main__":
     tokenizer = get_tokenizer(args.LM)
     model = get_model(args)
     tokenizer, model = add_pad_token_id(tokenizer, model)
-
-    training_args = ORPOConfig(
+    print(tokenizer)
+    training_args = DPOConfig(
         output_dir=output_directory,
         learning_rate=args.LEARNING_RATE,
         per_device_train_batch_size=args.TRAIN_BATCH_SIZE,
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         max_length=args.MAX_LEN,
         max_prompt_length=128,
     )
-    trainer = ORPOTrainer(
+    trainer = DPOTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
@@ -177,15 +177,16 @@ if __name__ == "__main__":
     trainer.train()
 
     # -------------- Test
-    test_dataset = test_dataset.map(trainer.tokenize_row)
-    res = trainer.predict(test_dataset)
-    test_metrics = res.metrics
-    test_metrics = {"test/"+k[5:]: v for k, v in test_metrics.items()}
-    wandb.log(test_metrics)
+    # test_dataset = test_dataset.map(trainer.tokenize_row)
+    # res = trainer.predict(test_dataset)
+    # test_metrics = res.metrics
+    # test_metrics = {"test/"+k[5:]: v for k, v in test_metrics.items()}
+    # wandb.log(test_metrics)
 
     # Unload model
     unload_model = trainer.model.merge_and_unload()
     
     # Save model and tokenizer
     unload_model.save_pretrained(output_directory)
+    print("hello")
     tokenizer.save_pretrained(output_directory)
