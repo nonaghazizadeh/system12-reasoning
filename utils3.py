@@ -11,7 +11,6 @@ from transformers import TrainerCallback
 from copy import deepcopy
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from peft import PeftModel, PeftConfig
-from IPython import embed
 
 dataset2label = {
     "personal": ["tpa", "oa", "ra"],
@@ -374,9 +373,10 @@ def add_pad_token_id(tokenizer, model):
     return tokenizer, model
 
 
+
 def get_pipeline(model_name_or_path, device):
     # make sure that text generation pipeline is using AutoModelForCausalLM
-    tokenizer = AutoTokenizer.from_pretrained('meta-llama/Meta-Llama-3-8B-Instruct')
+    tokenizer = AutoTokenizer.from_pretrained('mistralai/Mistral-7B-Instruct-v0.3')
     if "Phi" in model_name_or_path:
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
@@ -395,33 +395,44 @@ def get_pipeline(model_name_or_path, device):
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        device=device    )
+        device=device
+    )
     return pipe
 
 
-class LocalDecoder():
-    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
+class LocalDecoder:
+    def __init__(self, model_name_or_path, device, batch_size=1, MAX_LEN=256):
         self.pipeline = get_pipeline(model_name_or_path, device)
-        # self.batch_size = batch_size
+        self.batch_size = batch_size
         self.MAX_LEN = MAX_LEN
 
-
     def decode(self, inputs):
-        conversations = []
+        # Format inputs using the chat template
+        formatted_inputs = []
         for input in inputs:
-            conversation = [
-                {"role": "user", "content": input}]
-            conversations.append(conversation)
-        # conversation = [{"role": "user", "content": input}]
-        responses = self.pipeline(conversations,
-                                  max_new_tokens=self.MAX_LEN,
-                                  output_scores = True
-                                  #  batch_size=self.batch_size,
-                                  #  padding='longest'
-                                  )
-        content = []
-        for response in responses:
-            content.append(response[0]['generated_text'][-1]['content'])
+            messages = [
+                {"role": "user", "content": input}
+            ]
+            if hasattr(self.pipeline.tokenizer, "apply_chat_template"):
+                formatted_input = self.pipeline.tokenizer.apply_chat_template(
+                    messages, tokenize=False
+                )
+            else:
+                # Fallback to manual formatting
+                formatted_input = f"<|user|>\n{input}\n<|assistant|>\n"
+            formatted_inputs.append(formatted_input)
+
+        # Generate responses using the pipeline
+        responses = self.pipeline(
+            formatted_inputs,
+            max_new_tokens=self.MAX_LEN,
+            batch_size=self.batch_size,
+            padding='longest',  # Ensure padding for batch processing
+            return_full_text=False,  # Only return the generated text (not the input)
+        )
+
+        # Extract the generated content
+        content = [response[0]['generated_text'] for response in responses]
         return content
 
 
@@ -639,10 +650,11 @@ def create_logger(save_path, log_level=logging.INFO, prefix=""):
 
 
 def get_tokenizer(model_name_or_path):
-    if any(k in model_name_or_path.lower() for k in ("gemma", "llama", "gpt", "opt", "bloom")):
-        padding_side = "left"
-    else:
-        padding_side = "right"
+    padding_side = "left"
+    # if any(k in model_name_or_path.lower() for k in ("gemma", "llama", "gpt", "opt", "bloom")):
+    #     padding_side = "left"
+    # else:
+    #     padding_side = "right"
     print(f"Padding side: {padding_side}")
     tokenizer = AutoTokenizer.from_pretrained(
         model_name_or_path, padding_side=padding_side)

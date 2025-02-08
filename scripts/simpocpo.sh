@@ -6,9 +6,8 @@ label='labels'
 method='lora'
 epochs=(5)
 learning_rate=8e-06
-gpus=(1)
-#LM=('meta-llama/Meta-Llama-3-8B-Instruct')
-# LM=('kykim0/llama3-8b-ultrachat-sft')
+gpus=(5)
+# LM=('meta-llama/Meta-Llama-3-8B-Instruct')
 LM=('mistralai/Mistral-7B-Instruct-v0.3')
 dataset_name="system12_combined"
 
@@ -19,16 +18,18 @@ for epoch in "${epochs[@]}"; do
         SESSION_NAME="${gpu}_TRL"
         echo "[$gpu] $lm" 
         screen -dmS "$SESSION_NAME" bash -c "
-        WANDB_PROJECT=system12_orpo CUDA_VISIBLE_DEVICES=$gpu python train_trl.py \
+        WANDB_PROJECT=system12_simpo_pad CUDA_VISIBLE_DEVICES=$gpu python cposimpo.py \
                                                                 --label_col "$label" \
                                                                 --LM "$lm" \
                                                                 --method "$method" \
                                                                 --EPOCHS "$epoch" \
                                                                 --LEARNING_RATE "$learning_rate" \
-                                                                --dataset_name "$dataset_name" ;
+                                                                --dataset_name "$dataset_name" \
+                                                                --reject_system_1;
+
         exit"
 
-        # screen -dmS "$SESSION_NAME" bash -c "
+        #screen -dmS "$SESSION_NAME" bash -c "
         # WANDB_PROJECT=system12_orpo CUDA_VISIBLE_DEVICES=$gpu python train_trl.py \
         #                                                         --label_col "$label" \
         #                                                         --LM "$lm" \

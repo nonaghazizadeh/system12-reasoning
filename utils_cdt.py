@@ -304,66 +304,6 @@ def load_model_response(data_path):
     return df
 
 
-def get_dataset_loader_func(dataset_name):
-
-    if dataset_name == 'system12':
-        return load_system12_data()
-    elif dataset_name == 'system12_questions':
-        return load_system12_data()
-    elif dataset_name == 'system12_combined':
-        return load_system12_combined_data()
-    elif dataset_name == 'system12_combined_questions':
-        return load_system12_combined_questions_data()
-    elif dataset_name == 'system12_gpt_questions':
-        return load_system12_gpt_questions_data()
-    elif dataset_name == 'system12_10k_questions':
-        return load_system12_10k_questions_data()
-    # elif dataset_name == "personal_attack":
-    #     return load_personal_attack_data()
-    # elif dataset_name == "imdb":
-    #     return load_imdb_data()
-    # elif dataset_name == "agnews":
-    #     return load_agnews_data()
-    # elif dataset_name == "jigsaw_mola":
-    #     return load_jigsaw_data()
-    # elif dataset_name == "ghc":
-    #     return load_ghc_data()
-    # elif dataset_name == "ucc":
-    #     return load_ucc_data()
-    else:
-        return load_model_response(dataset_name)
-
-
-def create_logger(save_path, log_level=logging.INFO, prefix=""):
-    EXPERIMENT_DIRECTORY = save_path
-# Configure the logging settings
-    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-                        datefmt='%m/%d/%Y %H:%M:%S',
-                        level=logging.INFO)
-
-    logger = logging.getLogger(__name__)
-
-    # Create a log file with the current date and time in its name
-    current_datetime = datetime.datetime.now()
-    log_file = current_datetime.strftime(prefix+"%Y-%m-%d_%H-%M-%S.log")
-
-    # Create a file handler to write log messages to the specified log file
-    file_handler = logging.FileHandler(
-        os.path.join(EXPERIMENT_DIRECTORY, log_file))
-
-    # Set the log level for the file handler
-    file_handler.setLevel(logging.INFO)
-
-    # Create a formatter for the log messages (if you want a different format for the log file)
-    file_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-    file_handler.setFormatter(file_formatter)
-
-    # Add the file handler to the logger
-    logger.addHandler(file_handler)
-
-    return logger
-
 
 def add_pad_token_id(tokenizer, model):
     if getattr(tokenizer, "pad_token_id") is None:
@@ -400,65 +340,27 @@ def get_pipeline(model_name_or_path, device):
 
 
 class LocalDecoder():
-    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
+    def __init__(self, model_name_or_path, device, MAX_LEN=256):
         self.pipeline = get_pipeline(model_name_or_path, device)
         # self.batch_size = batch_size
         self.MAX_LEN = MAX_LEN
 
 
-    def decode(self, inputs):
+    def decode(self, input):
         conversations = []
-        for input in inputs:
-            conversation = [
-                {"role": "user", "content": input}]
-            conversations.append(conversation)
+        conversation = [
+            {"role": "user", "content": input}]
         # conversation = [{"role": "user", "content": input}]
-        responses = self.pipeline(conversations,
+        print(conversation)
+        responses = self.pipeline(conversation,
                                   max_new_tokens=self.MAX_LEN,
                                   output_scores = True
                                   #  batch_size=self.batch_size,
                                   #  padding='longest'
                                   )
-        content = []
-        for response in responses:
-            content.append(response[0]['generated_text'][-1]['content'])
-        return content
-
-
-class InstructionTunedDecoder():
-    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
-        model_name_or_path = model_name_or_path + "/best_model"
-        tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-        peft_config = PeftConfig.from_pretrained(model_name_or_path)
-
-        model = AutoModelForCausalLM.from_pretrained(
-            peft_config.base_model_name_or_path)
-        model.resize_token_embeddings(len(tokenizer), pad_to_multiple_of=8)
-        model = PeftModel.from_pretrained(model, model_name_or_path)
-        model = model.merge_and_unload()
-        self.pipeline = pipeline(
-            "text-generation", model=model, tokenizer=tokenizer, device=device)
-
-        self.MAX_LEN = MAX_LEN
-
-    def decode(self, inputs):
-        conversations = []
-        for input in inputs:
-            conversation = [{"role": "user", "content": input}]
-            conversation = concat_messages(
-                conversation, self.pipeline.tokenizer, add_assistant_in_the_end=True)
-            conversations.append(conversation)
-        # conversation = [{"role": "user", "content": input}]
-        responses = self.pipeline(conversations,
-                                  max_new_tokens=self.MAX_LEN,
-                                  #  batch_size=self.batch_size,
-                                  #  padding='longest'
-                                  )
-        content = []
-        for response in responses:
-            content.append(response[0]['generated_text'].split(
-                "<|assistant|>\n")[-1])
-        return content
+        print("-----")
+        print(responses[0]['generated_text'])
+        return responses[0]['generated_text'][-1]['content']
 
 
 def concat_messages(messages, tokenizer, add_assistant_in_the_end=False):

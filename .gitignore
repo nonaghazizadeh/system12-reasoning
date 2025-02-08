@@ -162,6 +162,7 @@ cython_debug/
 #.idea/
 
 data/
+prev_experiments/
 experiments/
 wandb/
 notebooks/

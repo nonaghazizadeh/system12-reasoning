@@ -17,26 +17,74 @@ from peft import (
     get_peft_model,
     LoraConfig,
 )
+import pandas as pd
 
 
-def create_feedback_datasets(df, seed, label_col, train_size=0.8, reject_system_1=True):
+def create_feedback_datasets(df, seed, label_col, train_size=0.8, data_balance="equal"):
     df = df.rename(columns={"Question": "prompt"})
     df_0 = df[df[label_col] == 0].reset_index(drop=True)
     df_1 = df[df[label_col] == 1].reset_index(drop=True)
     df_0, df_1 = df_0[['prompt', 'Answer']], df_1[['prompt', 'Answer']]
-    if reject_system_1:
-        df_0 = df_0.rename(columns={"Answer": "rejected"})
-        df_1 = df_1.rename(columns={"Answer": "chosen"})
-    else:
-        df_0 = df_0.rename(columns={"Answer": "chosen"})
-        df_1 = df_1.rename(columns={"Answer": "rejected"})
 
-    df = df_0.merge(df_1, on="prompt", how="inner")
-    print(df.iloc[-1])
-    train_df, rest_df = train_test_split(
-        df, train_size=train_size, random_state=seed)
-    val_df, test_df = train_test_split(
+    if data_balance == "1more":
+        quarter_index_0 = len(df_0) // 4
+        quarter_index_1 = len(df_1) // 4
+
+        df_first_quarter = pd.DataFrame({
+            'prompt': df_1.iloc[:quarter_index_1]['prompt'],
+            'rejected': df_0.iloc[:quarter_index_0]['Answer'],
+            'chosen': df_1.iloc[:quarter_index_1]['Answer']
+        })
+        df_remaining_three_quarters = pd.DataFrame({
+            'prompt': df_0.iloc[quarter_index_0:]['prompt'],
+            'rejected': df_1.iloc[quarter_index_1:]['Answer'],
+            'chosen': df_0.iloc[quarter_index_0:]['Answer']
+        })
+        df = pd.concat([df_first_quarter, df_remaining_three_quarters], ignore_index=True)
+        train_df, rest_df = train_test_split(
+            df, train_size=train_size, random_state=seed)
+        val_df, test_df = train_test_split(
         rest_df, train_size=0.5, random_state=seed)
+
+    elif data_balance == "2more":
+        quarter_index_0 = len(df_0) // 4
+        quarter_index_1 = len(df_1) // 4
+
+        df_first_quarter = pd.DataFrame({
+            'prompt': df_0.iloc[:quarter_index_0]['prompt'],
+            'rejected': df_1.iloc[:quarter_index_1]['Answer'],
+            'chosen': df_0.iloc[:quarter_index_0]['Answer']
+        })
+        df_remaining_three_quarters = pd.DataFrame({
+            'prompt': df_1.iloc[quarter_index_1:]['prompt'],
+            'rejected': df_0.iloc[quarter_index_0:]['Answer'],
+            'chosen': df_1.iloc[quarter_index_1:]['Answer']
+        })
+        df = pd.concat([df_first_quarter, df_remaining_three_quarters], ignore_index=True)
+        train_df, rest_df = train_test_split(
+            df, train_size=train_size, random_state=seed)
+        val_df, test_df = train_test_split(
+            rest_df, train_size=0.5, random_state=seed)
+    
+    elif data_balance == "equal":
+        half_index_0 = len(df_0) // 2
+        half_index_1 = len(df_1) // 2
+
+        df_first_half = pd.DataFrame({
+            'prompt': df_0.iloc[:half_index_0]['prompt'],
+            'rejected': df_0.iloc[:half_index_0]['Answer'],
+            'chosen': df_1.iloc[:half_index_1]['Answer']
+        })
+        df_second_half = pd.DataFrame({
+            'prompt': df_0.iloc[half_index_0:]['prompt'],
+            'rejected': df_1.iloc[half_index_1:]['Answer'],
+            'chosen': df_0.iloc[half_index_0:]['Answer']
+        })
+        df = pd.concat([df_first_half, df_second_half], ignore_index=True)
+        train_df, rest_df = train_test_split(
+            df, train_size=train_size, random_state=seed)
+        val_df, test_df = train_test_split(
+            rest_df, train_size=0.5, random_state=seed)
 
     train_dataset = HFDataset.from_pandas(train_df)
     val_dataset = HFDataset.from_pandas(val_df)
@@ -76,8 +124,8 @@ def parse_args():
 
     parser.add_argument("--dataset_name", type=str,
                         default="system12", help="the dataset for training")
-    parser.add_argument("--reject_system_1",
-                        action="store_true", help="Reject system 1 answers")
+    parser.add_argument("--data_balance",
+                        type=str, default="equal" ,help="ratio")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
 
     args = parser.parse_args()
@@ -95,9 +143,7 @@ def get_model(args):
             lora_dropout=args.lora_dropout)
     else:
         raise ValueError(f"Method {args.method} not recognized")
-    model = AutoModelForCausalLM.from_pretrained(args.LM,
-                                                 #  attn_implementation="flash_attention_2",
-                                                 )
+    model = AutoModelForCausalLM.from_pretrained(args.LM)
 
     if peft_config:
         model = get_peft_model(model, peft_config)
@@ -110,24 +156,26 @@ def get_model(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    # ------------- Set Seed
     set_seed(args.seed)
 
-    # ------------- Make Train/Val/Test Dataloaders
     if "/" in args.LM:
         LM_name = args.LM.split("/")[-1]
     run_name = f"{args.method}-{args.label_col}-{args.LM}-{args.seed}"
 
-    wandb.init(project="system12-dpo", name=run_name, config=args)
+    wandb.init(project="system12-orpo-ratio", name=run_name, config=args)
 
     
     output_directory = os.path.join(
-        "experiments", 'dpo-instruct',
+        "experiments", 'orpo-ratio',
         f"{args.method}-{LM_name}")
-    if args.reject_system_1:
-        output_directory += "-system2-10"
-    else:
-        output_directory += "-system1-10"
+
+    if args.data_balance == "1more":
+        output_directory += "-75sys1-25sys2"
+    elif args.data_balance == "2more":
+        output_directory += "-25sys1-75sys2"
+    elif args.data_balance == "equal":
+        output_directory += "-50sys1-50sys2"
+        
     os.makedirs(output_directory, exist_ok=True)
     logger = create_logger(output_directory)
     logger.info(args)
@@ -142,12 +190,13 @@ if __name__ == "__main__":
                                                                         seed=args.seed,
                                                                         label_col=args.label_col,
                                                                         train_size=args.train_size,
-                                                                        reject_system_1=args.reject_system_1)
+                                                                        reject_system_1=args.reject_system_1,
+                                                                        data_balance=args.data_balance)
     
     tokenizer = get_tokenizer(args.LM)
     model = get_model(args)
     tokenizer, model = add_pad_token_id(tokenizer, model)
-    print(tokenizer)
+
     training_args = DPOConfig(
         output_dir=output_directory,
         learning_rate=args.LEARNING_RATE,
@@ -176,17 +225,7 @@ if __name__ == "__main__":
 
     trainer.train()
 
-    # -------------- Test
-    # test_dataset = test_dataset.map(trainer.tokenize_row)
-    # res = trainer.predict(test_dataset)
-    # test_metrics = res.metrics
-    # test_metrics = {"test/"+k[5:]: v for k, v in test_metrics.items()}
-    # wandb.log(test_metrics)
-
-    # Unload model
     unload_model = trainer.model.merge_and_unload()
     
-    # Save model and tokenizer
     unload_model.save_pretrained(output_directory)
-    print("hello")
     tokenizer.save_pretrained(output_directory)

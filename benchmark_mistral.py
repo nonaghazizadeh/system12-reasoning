@@ -4,14 +4,17 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
-from custom_datasets import BenchmarkDataset
+from utils2 import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
+from custom_datasets_cot import BenchmarkDataset
 from transformers import set_seed
 
-@torch.inference_mode
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['TORCH_USE_CUDA_DSA'] = '1'
+
 def main():
     args = parse_arguments()
-    output_directory = os.path.join("experiments", 'prob_benchmark',
+    output_directory = os.path.join("experiments", 'mistral_benchmark_cot',
                                     args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
     csv_file = os.path.join(output_directory, "result.csv")

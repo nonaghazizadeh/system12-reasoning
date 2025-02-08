@@ -1,6 +1,6 @@
 #!/bin/bash
 cd .. 
-source ./venv/bin/activate
+source ./myenv/bin/activate
 
 # check if there is $HF_TOKEN in the environment variables, or if the huggingface-cli is installed and logged in 
 if huggingface-cli whoami &>/dev/null; then

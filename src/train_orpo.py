@@ -95,9 +95,7 @@ def get_model(args):
             lora_dropout=args.lora_dropout)
     else:
         raise ValueError(f"Method {args.method} not recognized")
-    model = AutoModelForCausalLM.from_pretrained(args.LM,
-                                                 #  attn_implementation="flash_attention_2",
-                                                 )
+    model = AutoModelForCausalLM.from_pretrained(args.LM)
 
     if peft_config:
         model = get_peft_model(model, peft_config)
@@ -110,15 +108,13 @@ def get_model(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    # ------------- Set Seed
     set_seed(args.seed)
 
-    # ------------- Make Train/Val/Test Dataloaders
     if "/" in args.LM:
         LM_name = args.LM.split("/")[-1]
     run_name = f"{args.method}-{args.label_col}-{args.LM}-{args.seed}"
 
-    wandb.init(project="system12_orpo", name=run_name, config=args)
+    wandb.init(project="system12-orpo", name=run_name, config=args)
 
     
     output_directory = os.path.join(
@@ -175,17 +171,7 @@ if __name__ == "__main__":
     )
 
     trainer.train()
-
-    # -------------- Test
-    test_dataset = test_dataset.map(trainer.tokenize_row)
-    res = trainer.predict(test_dataset)
-    test_metrics = res.metrics
-    test_metrics = {"test/"+k[5:]: v for k, v in test_metrics.items()}
-    wandb.log(test_metrics)
-
-    # Unload model
     unload_model = trainer.model.merge_and_unload()
     
-    # Save model and tokenizer
     unload_model.save_pretrained(output_directory)
     tokenizer.save_pretrained(output_directory)

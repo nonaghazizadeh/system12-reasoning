@@ -2,17 +2,17 @@ import wandb
 import argparse
 import os
 import torch
-import pandas as pd
 from sklearn.model_selection import train_test_split
 from utils import create_logger, get_dataset_loader_func, add_pad_token_id, get_tokenizer
 from datasets import Dataset as HFDataset
+import pandas as pd
 from transformers import (
     AutoModelForCausalLM,
     set_seed,
 )
 from trl import (
-    CPOConfig,
-    CPOTrainer,
+    DPOConfig,
+    DPOTrainer,
 )
 from peft import (
     get_peft_model,
@@ -94,6 +94,7 @@ def create_feedback_datasets(df, seed, label_col, train_size=0.8, data_balance="
     print(f"Test dataset size: {len(test_dataset)}")
     return train_dataset, val_dataset, test_dataset
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_size", type=float,
@@ -119,7 +120,7 @@ def parse_args():
     parser.add_argument("--lora_rank", default=8, type=int)
     parser.add_argument("--lora_dropout", default=0.1, type=int)
 
-    parser.add_argument("--orpo_beta", default=0.1, type=int)
+    parser.add_argument("--dpo_beta", default=0.1, type=int)
 
     parser.add_argument("--dataset_name", type=str,
                         default="system12", help="the dataset for training")
@@ -142,9 +143,7 @@ def get_model(args):
             lora_dropout=args.lora_dropout)
     else:
         raise ValueError(f"Method {args.method} not recognized")
-    model = AutoModelForCausalLM.from_pretrained(args.LM,
-                                                 #  attn_implementation="flash_attention_2",
-                                                 )
+    model = AutoModelForCausalLM.from_pretrained(args.LM)
 
     if peft_config:
         model = get_peft_model(model, peft_config)
@@ -157,25 +156,26 @@ def get_model(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    # ------------- Set Seed
     set_seed(args.seed)
 
-    # ------------- Make Train/Val/Test Dataloaders
     if "/" in args.LM:
         LM_name = args.LM.split("/")[-1]
     run_name = f"{args.method}-{args.label_col}-{args.LM}-{args.seed}"
 
-    wandb.init(project="system12_simpo", name=run_name, config=args)
+    wandb.init(project="system12-dpo-ratio", name=run_name, config=args)
 
     
     output_directory = os.path.join(
-        "experiments", 'simpo',
+        "experiments", 'dpo-ratio',
         f"{args.method}-{LM_name}")
-    # if args.reject_system_1:
-    #     output_directory += "-system2-6"
-    # else:
-    #     output_directory += "-system1-6"
-    output_directory += "-75sys1-25sys2"
+
+    if args.data_balance == "1more":
+        output_directory += "-75sys1-25sys2"
+    elif args.data_balance == "2more":
+        output_directory += "-25sys1-75sys2"
+    elif args.data_balance == "equal":
+        output_directory += "-50sys1-50sys2"
+        
     os.makedirs(output_directory, exist_ok=True)
     logger = create_logger(output_directory)
     logger.info(args)
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     model = get_model(args)
     tokenizer, model = add_pad_token_id(tokenizer, model)
     print(tokenizer)
-    training_args = CPOConfig(
+    training_args = DPOConfig(
         output_dir=output_directory,
         learning_rate=args.LEARNING_RATE,
         per_device_train_batch_size=args.TRAIN_BATCH_SIZE,
@@ -212,16 +212,14 @@ if __name__ == "__main__":
         save_total_limit=1,
         beta=args.orpo_beta,
         max_length=args.MAX_LEN,
-        loss_type="simpo",
-        cpo_alpha=0.0,
         max_prompt_length=128,
     )
-    trainer = CPOTrainer(
+    trainer = DPOTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
     )
 
     trainer.train()
@@ -238,4 +236,5 @@ if __name__ == "__main__":
     
     # Save model and tokenizer
     unload_model.save_pretrained(output_directory)
+    print("hello")
     tokenizer.save_pretrained(output_directory)

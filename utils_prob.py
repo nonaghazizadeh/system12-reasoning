@@ -12,6 +12,7 @@ from copy import deepcopy
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from peft import PeftModel, PeftConfig
 from IPython import embed
+import torch.nn.functional as F
 
 dataset2label = {
     "personal": ["tpa", "oa", "ra"],
@@ -390,7 +391,6 @@ def get_pipeline(model_name_or_path, device):
 
     tokenizer, model = add_pad_token_id(tokenizer, model)
     # Check if the model requires a chat template
-
     pipe = pipeline(
         "text-generation",
         model=model,
@@ -398,10 +398,15 @@ def get_pipeline(model_name_or_path, device):
         device=device    )
     return pipe
 
-
 class LocalDecoder():
-    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
-        self.pipeline = get_pipeline(model_name_or_path, device)
+    def __init__(self, model_name_or_path, device, MAX_LEN=256):
+        # self.pipeline = get_pipeline(model_name_or_path, device)
+        self.device = device
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name_or_path
+        ).to(self.device)
+        tokenizer = AutoTokenizer.from_pretrained('meta-llama/Meta-Llama-3-8B-Instruct', padding_side="left")
+        self.tokenizer, self.model = add_pad_token_id(tokenizer, self.model)
         # self.batch_size = batch_size
         self.MAX_LEN = MAX_LEN
 
@@ -412,53 +417,36 @@ class LocalDecoder():
             conversation = [
                 {"role": "user", "content": input}]
             conversations.append(conversation)
-        # conversation = [{"role": "user", "content": input}]
-        responses = self.pipeline(conversations,
-                                  max_new_tokens=self.MAX_LEN,
-                                  output_scores = True
-                                  #  batch_size=self.batch_size,
-                                  #  padding='longest'
-                                  )
-        content = []
-        for response in responses:
-            content.append(response[0]['generated_text'][-1]['content'])
-        return content
+        inputs = self.tokenizer.apply_chat_template(conversations,
+                                                    add_special_tokens=False, 
+                                                    tokenize=True, 
+                                                    add_generation_prompt=True, 
+                                                    padding=True, 
+                                                    truncation=True,
+                                                    return_dict=True,
+                                                    return_tensors="pt").to(self.device)
+        responses = self.model.generate(
+            **inputs,
+            num_return_sequences=1,
+            return_dict_in_generate=True,
+            output_scores=True,
+            pad_token_id=self.tokenizer.eos_token_id
+        )
 
-
-class InstructionTunedDecoder():
-    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
-        model_name_or_path = model_name_or_path + "/best_model"
-        tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-        peft_config = PeftConfig.from_pretrained(model_name_or_path)
-
-        model = AutoModelForCausalLM.from_pretrained(
-            peft_config.base_model_name_or_path)
-        model.resize_token_embeddings(len(tokenizer), pad_to_multiple_of=8)
-        model = PeftModel.from_pretrained(model, model_name_or_path)
-        model = model.merge_and_unload()
-        self.pipeline = pipeline(
-            "text-generation", model=model, tokenizer=tokenizer, device=device)
-
-        self.MAX_LEN = MAX_LEN
-
-    def decode(self, inputs):
-        conversations = []
-        for input in inputs:
-            conversation = [{"role": "user", "content": input}]
-            conversation = concat_messages(
-                conversation, self.pipeline.tokenizer, add_assistant_in_the_end=True)
-            conversations.append(conversation)
-        # conversation = [{"role": "user", "content": input}]
-        responses = self.pipeline(conversations,
-                                  max_new_tokens=self.MAX_LEN,
-                                  #  batch_size=self.batch_size,
-                                  #  padding='longest'
-                                  )
-        content = []
-        for response in responses:
-            content.append(response[0]['generated_text'].split(
-                "<|assistant|>\n")[-1])
-        return content
+        tokens_probs = []
+        input_ids = inputs["input_ids"]
+        num_tokens_already_in_input = input_ids.shape[1]
+        for batch_idx in range(input_ids.shape[0]):
+            sentence = []
+            for i, token in enumerate(responses.sequences[batch_idx, num_tokens_already_in_input:]):
+                token_text = self.tokenizer.decode(token)
+                prob = F.softmax(responses.scores[i], dim=-1)[batch_idx][token].item()
+                sentence.append((token_text, prob))
+                # tokens_probs.append((token_text, prob))
+                print(f"{token_text}\t\t{prob:.4f}")
+            tokens_probs.append(sentence)
+        return tokens_probs
+        
 
 
 def concat_messages(messages, tokenizer, add_assistant_in_the_end=False):

@@ -4,128 +4,48 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
+import json
+from utils_prob import create_logger, LocalDecoder
 from custom_datasets import BenchmarkDataset
 from transformers import set_seed
 
-@torch.inference_mode
 def main():
     args = parse_arguments()
-    output_directory = os.path.join("experiments", 'prob_benchmark',
+    output_directory = os.path.join("experiments", 'prob_benchmarkv2',
                                     args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
-    csv_file = os.path.join(output_directory, "result.csv")
-    # if os.path.exists(csv_file):
-    #     logger.info(f"CSV file {csv_file} already exists. Skipping benchmark.")
-    #     return
+    # csv_file = os.path.join(output_directory, "result.csv")
+
     logger = create_logger(output_directory)
     logger.info('*****************************')
     logger.info(args)
     logger.info('*****************************')
-    # print('*****************************')
-    # print(args)
-    # print('*****************************')
 
     set_seed(args.random_seed)
 
-    # print("OPENAI_API_KEY:")
-    # print(os.getenv("OPENAI_API_KEY"))
-
-    # Initialize decoder class (load model and tokenizer) ...
-    # decoder = Decoder(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if "instruction_tunning" in args.model:
-        print()
-        decoder = InstructionTunedDecoder(model_name_or_path=args.model,
-                                          batch_size=args.batch_size, device=device)
-    else:
-        decoder = LocalDecoder(model_name_or_path=args.model,
-                               batch_size=args.batch_size, device=device)
+    decoder = LocalDecoder(model_name_or_path=args.model, device=device)
 
-    # print("setup data loader ...")
     logger.info("setup data loader ...")
     dataset = BenchmarkDataset(args)
  
+    print(dataset)
+    print('------')
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=args.batch_size)
-    # dataloader = setup_data_loader(args)
-    # print_now()
-    # print(dataloader)
-    total = 0
-    correct_list = []
-    csv_data = {
-        "input": [],
-        "pred_before": [],
-        "pred_after": [],
-        "GT": [],
-    }
+    print(dataloader)
+
+    counter = 1
     for data in tqdm(dataloader):
         x, y = data
 
         x = list(x)
-        z = decoder.decode(x)
-        z2 = [temp + "\n" + temp_out + args.direct_answer_trigger for temp, temp_out in zip(x, z)]
-        pred = decoder.decode(z2)
-        csv_data["input"] += z2
-        csv_data["pred_before"] += pred
-
-        pred = answer_cleansing(args, pred)
-        csv_data["pred_after"] += pred
-        csv_data["GT"] += y
-        print(z2)
-        print("--------")
-        pred = clean_pred(pred)
-        print(pred)
-        print("--------")
-        y = clean_ans(y)
-        print(y)
-        correct = (np.array(pred) == np.array(y)).sum().item()
-        correct_list.append(correct)
-        total += len(y)
-
-        if (args.limit_dataset_size != 0) and ((total+1) >= args.limit_dataset_size):
-            break
-
-    accuracy = (sum(correct_list) * 1.0 / total) * 100
-    logger.info(f"accuracy : {accuracy}")
-
-    csv_data = pd.DataFrame(csv_data)
-    csv_data.to_csv(csv_file, index=False)
-
-
-def clean_ans(answers):
-    new_answers = []
-    for ans in answers:
-        new_ans = ""
-        for i in range(len(ans)):
-            if ans[i] == ",":
-                continue
-            new_ans += ans[i]
-        # print(ans, new_ans)
-
-        if '.' in new_ans:
-            pos = new_ans.find('.')
-            if len(new_ans) - pos - 1 > 7:
-                new_ans = new_ans[:pos + 7]
-        new_answers.append(new_ans)
-    return new_answers
-
-
-def clean_pred(preds):
-    clean_preds = []
-    for pred in preds:
-        if '.' in pred:
-            pred = pred.rstrip('0')
-            if pred.endswith('.'):
-                pred = pred[:-1]
-
-        if '.' in pred:
-            pos = pred.find('.')
-            if len(pred) - pos - 1 > 7:
-                pred = pred[:pos + 7]
-        clean_preds.append(pred)
-    return clean_preds
+        tokens = decoder.decode(x)
+        with open(output_directory + "/" + str(counter) + 'data.json', 'w', encoding='utf-8') as f:
+            json.dump(tokens, f, ensure_ascii=False, indent=4)
+        
+        counter += 1
 
 
 def parse_arguments():

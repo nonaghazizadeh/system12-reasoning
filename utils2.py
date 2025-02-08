@@ -11,7 +11,6 @@ from transformers import TrainerCallback
 from copy import deepcopy
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from peft import PeftModel, PeftConfig
-from IPython import embed
 
 dataset2label = {
     "personal": ["tpa", "oa", "ra"],
@@ -374,9 +373,10 @@ def add_pad_token_id(tokenizer, model):
     return tokenizer, model
 
 
+
 def get_pipeline(model_name_or_path, device):
     # make sure that text generation pipeline is using AutoModelForCausalLM
-    tokenizer = AutoTokenizer.from_pretrained('meta-llama/Meta-Llama-3-8B-Instruct')
+    tokenizer = AutoTokenizer.from_pretrained('mistralai/Mistral-7B-Instruct-v0.1')
     if "Phi" in model_name_or_path:
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
@@ -395,7 +395,8 @@ def get_pipeline(model_name_or_path, device):
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        device=device    )
+        device=device
+    )
     return pipe
 
 
@@ -415,7 +416,6 @@ class LocalDecoder():
         # conversation = [{"role": "user", "content": input}]
         responses = self.pipeline(conversations,
                                   max_new_tokens=self.MAX_LEN,
-                                  output_scores = True
                                   #  batch_size=self.batch_size,
                                   #  padding='longest'
                                   )
@@ -639,10 +639,11 @@ def create_logger(save_path, log_level=logging.INFO, prefix=""):
 
 
 def get_tokenizer(model_name_or_path):
-    if any(k in model_name_or_path.lower() for k in ("gemma", "llama", "gpt", "opt", "bloom")):
-        padding_side = "left"
-    else:
-        padding_side = "right"
+    padding_side = "left"
+    # if any(k in model_name_or_path.lower() for k in ("gemma", "llama", "gpt", "opt", "bloom")):
+    #     padding_side = "left"
+    # else:
+    #     padding_side = "right"
     print(f"Padding side: {padding_side}")
     tokenizer = AutoTokenizer.from_pretrained(
         model_name_or_path, padding_side=padding_side)

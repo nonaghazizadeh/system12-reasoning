@@ -60,7 +60,7 @@ def data_reader(args):
     questions = []
     answers = []
     decoder = json.JSONDecoder()
-
+    cot_prompt = "answer the question step by step"
     if args.dataset == "aqua":
         with open(args.dataset_path) as f:
             lines = f.readlines()
@@ -69,7 +69,7 @@ def data_reader(args):
                 choice = "(" + "(".join(json_res["options"])
                 choice = choice.replace("(", " (").replace(")", ") ")
                 choice = "Answer Choices:" + choice
-                questions.append(json_res["question"].strip() + " " + choice)
+                questions.append(cot_prompt + json_res["question"].strip() + " " + choice)
                 answers.append(json_res["correct"])
 
     elif args.dataset == "gsm8k":
@@ -77,7 +77,7 @@ def data_reader(args):
             lines = f.readlines()
             for line in lines:
                 json_res = decoder.raw_decode(line)[0]
-                questions.append(json_res["question"].strip())
+                questions.append(cot_prompt + json_res["question"].strip())
                 answers.append(json_res["answer"].split("#### ")[-1])
 
     elif args.dataset == "commonsensqa":
@@ -91,7 +91,7 @@ def data_reader(args):
                     choice += c["label"]
                     choice += ") "
                     choice += c["text"]
-                questions.append(json_res["question"]
+                questions.append(cot_prompt + json_res["question"]
                                  ["stem"].strip() + " " + choice)
                 answers.append(json_res["answerKey"])
 
@@ -103,7 +103,7 @@ def data_reader(args):
                 a = str(line["lSolutions"][0])
                 if a[-2:] == ".0":
                     a = a[:-2]
-                questions.append(q)
+                questions.append(cot_prompt + q)
                 answers.append(a)
 
     elif args.dataset == "strategyqa":
@@ -116,7 +116,7 @@ def data_reader(args):
                     a = "yes"
                 else:
                     a = "no"
-                questions.append(q)
+                questions.append(cot_prompt + q)
                 answers.append(a)
 
     elif args.dataset == "svamp":
@@ -127,7 +127,7 @@ def data_reader(args):
                 a = str(line["Answer"])
                 if a[-2:] == ".0":
                     a = a[:-2]
-                questions.append(q)
+                questions.append(cot_prompt + q)
                 answers.append(a)
 
     elif args.dataset in ("bigbench_date", "object_tracking"):
@@ -161,7 +161,7 @@ def data_reader(args):
                         a = choice_index[i]
                         # a = key
                 q = q + " " + choice
-                questions.append(q)
+                questions.append(cot_prompt + q)
                 answers.append(a)
 
     elif args.dataset in ("coin_flip", "last_letters"):
@@ -171,7 +171,7 @@ def data_reader(args):
             for line in json_data:
                 q = line["question"]
                 a = line["answer"]
-                questions.append(q)
+                questions.append(cot_prompt + q)
                 answers.append(a)
 
     elif args.dataset in ("age", "disability_status", "gender_identity", "nationality", "physical_appearance", "race_ethnicity", "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"):
