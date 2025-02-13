@@ -115,7 +115,7 @@ if __name__ == "__main__":
         LM_name = args.LM.split("/")[-1]
     run_name = f"{args.method}-{args.label_col}-{args.LM}-{args.seed}"
 
-    wandb.init(project="system12-dpo-best-accuracy", name=run_name, config=args)
+    wandb.init(project="system12-dpo", name=run_name, config=args)
 
     
     output_directory = os.path.join(

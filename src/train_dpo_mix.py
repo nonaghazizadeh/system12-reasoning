@@ -223,18 +223,7 @@ if __name__ == "__main__":
     )
 
     trainer.train()
-
-    # -------------- Test
-    # test_dataset = test_dataset.map(trainer.tokenize_row)
-    # res = trainer.predict(test_dataset)
-    # test_metrics = res.metrics
-    # test_metrics = {"test/"+k[5:]: v for k, v in test_metrics.items()}
-    # wandb.log(test_metrics)
-
-    # Unload model
     unload_model = trainer.model.merge_and_unload()
     
-    # Save model and tokenizer
     unload_model.save_pretrained(output_directory)
-    print("hello")
     tokenizer.save_pretrained(output_directory)

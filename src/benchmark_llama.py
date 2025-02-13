@@ -7,11 +7,11 @@ from tqdm import tqdm
 from utils import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
 from custom_datasets import BenchmarkDataset
 from transformers import set_seed
-
-
+import re
+@torch.inference_mode
 def main():
     args = parse_arguments()
-    output_directory = os.path.join("experiments", 'benchmark-bias',
+    output_directory = os.path.join("experiments", 'prob_benchmark',
                                     args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
     csv_file = os.path.join(output_directory, "result.csv")
@@ -22,17 +22,9 @@ def main():
     logger.info('*****************************')
     logger.info(args)
     logger.info('*****************************')
-    # print('*****************************')
-    # print(args)
-    # print('*****************************')
 
     set_seed(args.random_seed)
 
-    # print("OPENAI_API_KEY:")
-    # print(os.getenv("OPENAI_API_KEY"))
-
-    # Initialize decoder class (load model and tokenizer) ...
-    # decoder = Decoder(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if "instruction_tunning" in args.model:
@@ -43,13 +35,11 @@ def main():
         decoder = LocalDecoder(model_name_or_path=args.model,
                                batch_size=args.batch_size, device=device)
 
-    # print("setup data loader ...")
     logger.info("setup data loader ...")
     dataset = BenchmarkDataset(args)
+ 
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=args.batch_size)
-    # dataloader = setup_data_loader(args)
-    # print_now()
 
     total = 0
     correct_list = []
@@ -63,7 +53,6 @@ def main():
         x, y = data
 
         x = list(x)
-        
         z = decoder.decode(x)
         z2 = [temp + "\n" + temp_out + args.direct_answer_trigger for temp, temp_out in zip(x, z)]
         pred = decoder.decode(z2)
@@ -73,10 +62,8 @@ def main():
         pred = answer_cleansing(args, pred)
         csv_data["pred_after"] += pred
         csv_data["GT"] += y
-
         pred = clean_pred(pred)
         y = clean_ans(y)
-
         correct = (np.array(pred) == np.array(y)).sum().item()
         correct_list.append(correct)
         total += len(y)
@@ -88,7 +75,8 @@ def main():
     logger.info(f"accuracy : {accuracy}")
 
     csv_data = pd.DataFrame(csv_data)
-    csv_data.to_csv(csv_file, index=False)
+    data = final_clean_ans(csv_data)
+    csv_data.to_csv(data, index=False)
 
 
 def clean_ans(answers):
@@ -99,7 +87,6 @@ def clean_ans(answers):
             if ans[i] == ",":
                 continue
             new_ans += ans[i]
-        # print(ans, new_ans)
 
         if '.' in new_ans:
             pos = new_ans.find('.')
@@ -124,6 +111,49 @@ def clean_pred(preds):
         clean_preds.append(pred)
     return clean_preds
 
+def extract_last_number(text):
+    matches = re.findall(r'\d+\.?\d*', text)
+    return matches[-1] if matches else None
+
+def extract_last_letter_in_parenthesis_af(text):
+    matches = re.findall(r'\(?(A|B|C|D|E|F)\)', text)
+    return matches[-1] if matches else None
+
+def extract_last_letter_in_parenthesis_ae(text):
+    matches = re.findall(r'\(?(A|B|C|D|E)\)', text)
+    return matches[-1] if matches else None
+
+def extract_last_letter_in_parenthesis_ac(text):
+    matches = re.findall(r'\(?(A|B|C)\)', text)
+    return matches[-1] if matches else None
+
+def extract_last_yes_no(text):
+    matches = re.findall(r'\b(?:yes|no)\b', text, re.IGNORECASE)
+    return matches[-1].lower() if matches else None
+
+def process_text_last_letters(text):
+    text = str(text)
+    if ":" in text:
+        text = text.split(":")[-1]
+    elif "is" in text:
+        text = text.split("is")[-1]
+    return text.lower().replace("-", "").replace(" ","").replace(".","")
+
+def final_clean_ans(args, csv):
+    if args.dataset in ["gsm8k", "multiarith", "svamp", "addsub", "singleeq"]:
+        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_number)
+    elif args.dataset in ["coin_flip", "strategyqa"]:
+        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_yes_no)
+    elif args.dataset in ["commonsensqa", "aqua"]:
+        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_ae)
+    elif args.dataset == "bigbench_date":
+        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_af)
+    elif args.dataset == "object_tracking":
+        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_ac)
+    elif args.dataset == "last_letters":
+        csv['pred_after'] = csv['pred_before'].astype(str).apply(process_text_last_letters)
+    
+    return csv
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Zero-shot-CoT")
@@ -136,7 +166,10 @@ def parse_arguments():
         choices=["aqua", "gsm8k", "commonsensqa",
                  "addsub", "multiarith",  "strategyqa",
                  "svamp", "singleeq", "bigbench_date",
-                 "object_tracking", "coin_flip", "last_letters"],
+                 "object_tracking", "coin_flip", "last_letters", 
+                 "age", "disability_status", "gender_identity", 
+                 "nationality", "physical_appearance", "race_ethnicity", 
+                 "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"],
         help="dataset used for experiment"
     )
 
@@ -162,7 +195,7 @@ def parse_arguments():
     )
 
     args = parser.parse_args()
-
+    print(args.dataset)
     if args.dataset == "aqua":
         args.dataset_path = "./data/benchmark/AQuA/test.json"
         args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
@@ -200,6 +233,40 @@ def parse_arguments():
     elif args.dataset == "last_letters":
         args.dataset_path = "./data/benchmark/last_letters/last_letters.json"
         args.direct_answer_trigger = "\nTherefore, the final answer is"
+    elif args.dataset == "age":
+        args.dataset_path = "./data/bias_benchmark/age.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "disability_status":
+        args.dataset_path = "./data/bias_benchmark/disability_status.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "gender_identity":
+        args.dataset_path = "./data/bias_benchmark/gender_identity.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "nationality":
+        args.dataset_path = "./data/bias_benchmark/nationality.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "physical_appearance":
+        args.dataset_path = "./data/bias_benchmark/physical_appearance.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "race_ethnicity":
+        args.dataset_path = "./data/bias_benchmark/race_ethnicity.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "race_x_gender":
+        args.dataset_path = "./data/bias_benchmark/race_x_gender.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "race_x_ses":
+        args.dataset_path = "./data/bias_benchmark/race_x_ses.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "religion":
+        args.dataset_path = "./data/bias_benchmark/religion.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "ses":
+        args.dataset_path = "./data/bias_benchmark/ses.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    elif args.dataset == "sexual_orientation":
+        args.dataset_path = "./data/bias_benchmark/sexual_orientation.json"
+        args.direct_answer_trigger = "\nTherefore, among A through C, the answer is"
+    
     else:
         raise ValueError("dataset is not properly defined ...")
 
@@ -223,6 +290,7 @@ def parse_arguments():
     elif args.dataset in ["commonsensqa", "strategyqa"]:
         args.role_setting = "From now on, you are a contestant in the general knowledge quiz contest and always answer all kinds of common sense questions accurately. I am the moderator of the game and the final is about to start."
         args.reply = "That sounds like an exciting challenge! I'm ready to participate in the quiz contest as a contestant. Please go ahead and start the final round—I'm here to provide accurate answers to your common sense questions."
+    
     return args
 
 

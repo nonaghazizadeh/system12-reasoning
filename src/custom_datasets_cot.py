@@ -15,29 +15,7 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         return {'input_ids': self.data.iloc[idx]['input_ids'].flatten(),
                 'attention_mask': self.data.iloc[idx]['attention_mask'].flatten(),
-                # 'text': self.data.iloc[idx]['text'],
                 }
-
-    # def collate_fn(self, data):
-    #     data_tensor = {}
-    #     ignore_keys = {}
-    #     for key in data[0].keys():
-    #         # if key in ignore_keys or "text" in key:
-    #         if key == "text":
-    #             data_tensor[key] = [item[key] for item in data]
-    #         # elif key == "labels":
-    #         #     data_tensor[key] = pad_sequence(
-    #         #         [torch.tensor(item[key], dtype=torch.long)
-    #         #         for item in data],
-    #         #         batch_first=True, padding_value=-100).to(self.args.device)
-    #         else:
-    #             data_tensor[key] = pad_sequence(
-    #                 [torch.tensor(item[key], dtype=torch.long)
-    #                 for item in data],
-    #                 batch_first=True, padding_value=0).to(self.args.device)
-    #     return data_tensor
-
-# Initialize tokenizer
 
 
 class BenchmarkDataset(Dataset):
@@ -60,7 +38,7 @@ def data_reader(args):
     questions = []
     answers = []
     decoder = json.JSONDecoder()
-    cot_prompt = "answer the question step by step"
+    cot_prompt = "Let's think step by step"
     if args.dataset == "aqua":
         with open(args.dataset_path) as f:
             lines = f.readlines()
@@ -144,7 +122,6 @@ def data_reader(args):
                 q = line["input"].strip()
                 if args.dataset == "bigbench_date":
                     choice = "Answer Choices:"
-                    # Randomly shuffle the answer choice dictionary because the original answer is always A ...
                     choice_dic = shuffleDict(line["target_scores"])
                 elif args.dataset == "object_tracking":
                     choice = "\nWhich choice is true ? Answer Choices:"
@@ -159,7 +136,6 @@ def data_reader(args):
                     choice += key
                     if value == 1:
                         a = choice_index[i]
-                        # a = key
                 q = q + " " + choice
                 questions.append(cot_prompt + q)
                 answers.append(a)
@@ -174,7 +150,8 @@ def data_reader(args):
                 questions.append(cot_prompt + q)
                 answers.append(a)
 
-    elif args.dataset in ("age", "disability_status", "gender_identity", "nationality", "physical_appearance", "race_ethnicity", "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"):
+    elif args.dataset in ("age", "disability_status", "gender_identity", "nationality", "physical_appearance", 
+                          "race_ethnicity", "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"):
         with open(args.dataset_path) as f:
             json_data = json.load(f)
             label_mapping = {0: "A", 1: "B", 2: "C"}
@@ -213,5 +190,4 @@ def shuffleDict(d):
     [(key, d[key]) for key in keys]
     random.shuffle(keys)
     keys = [(key, d[key]) for key in keys]
-    # keys = d(keys)
     return dict(keys)
