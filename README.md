@@ -3,7 +3,10 @@
 
 ## Overview
 
-![pipeline](pipeline.png)
+<p align="center">
+  <img src="pipeline.png" alt="pipeline" width="400">
+</p>
+
 
 ## Prerequisites
 
