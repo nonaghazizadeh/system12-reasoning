@@ -165,6 +165,7 @@ data/benchmark/
 data/bias_benchmark/
 data/instruction_tunning/
 data/processed_instruction_tunning/
+data/system12/
 prev_experiments/
 experiments/
 wandb/
