@@ -400,14 +400,12 @@ def get_pipeline(model_name_or_path, device):
 
 class LocalDecoder():
     def __init__(self, model_name_or_path, device, MAX_LEN=256):
-        # self.pipeline = get_pipeline(model_name_or_path, device)
         self.device = device
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path
         ).to(self.device)
         tokenizer = AutoTokenizer.from_pretrained('meta-llama/Meta-Llama-3-8B-Instruct', padding_side="left")
         self.tokenizer, self.model = add_pad_token_id(tokenizer, self.model)
-        # self.batch_size = batch_size
         self.MAX_LEN = MAX_LEN
 
 
@@ -498,7 +496,8 @@ def answer_cleansing(args, preds):
                 pred = pred[left_index:right_index+1].lower()
             pred = re.sub("\"|\'|\n|\.|\s", "", pred)
             pred = [pred]
-        elif args.dataset in ("age", "disability_status", "gender_identity", "nationality", "physical_appearance", "race_ethnicity", "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"):
+        elif args.dataset in ("age", "disability_status", "gender_identity", "nationality", "physical_appearance", 
+                              "race_ethnicity", "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"):
             pred = re.findall(r'A|B|C', pred)
         else:
             raise ValueError("dataset is not properly defined ...")
