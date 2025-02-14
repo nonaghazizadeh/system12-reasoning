@@ -48,9 +48,13 @@ wandb login
 ### Scripts for running the experiments
 
 #### scripts/train_dpo.sh
+The shell script will run the `train_dpo.py` for aligning our base models, Llama 3 and Mistral v0.1 with System 1 data and System 2 data with DPO algorithm. 
 
 #### scripts/train_simpo.sh
+The shell script will run the `train_simpo.py` for aligning our base models, Llama 3 and Mistral v0.1 with System 1 data and System 2 data with SIMPO algorithm. 
 
 #### scripts/train_dpo_ratio.sh
+The shell script will run the `train_dpo_ratio.py` for aligning our base models, Llama 3 and Mistral v0.1 with different ratios of System 1 data and System 2 data with DPO algorithm. 
 
 #### scripts/train_simpo_ratio.sh
+The shell script will run the `train_dpo_ratio.py` for aligning our base models, Llama 3 and Mistral v0.1 with different ratios of System 1 data and System 2 data with SIMPO algorithm. 
