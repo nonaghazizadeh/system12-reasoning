@@ -85,4 +85,10 @@ The shell script will run the `benchmark_llama.py` to evaluate our Mistral v0.1 
 The shell script will run the `benchmark_probabilities.py` to captures the generated tokens along with their probabilities for furthut interprebilities.
 
 #### src/interpretability/check_sys1_2_answers_generations.ipynb
-The notebook generate a plot for showing th proportion of definitive answers in the first three sentences.
+The notebook generate a plot for showing the proportion of definitive answers in the first three sentences.
+
+#### src/interpretability/check_probabilities.ipynb
+The notebook generate a plot for showing the summed log probabilities of models’ reasoning.
+
+#### src/interpretability/analysis_on_results_agg.ipynb
+The notebook generate a plot for showing the ratio of hedge words in models’ reasoning.
