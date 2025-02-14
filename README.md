@@ -35,7 +35,7 @@ wandb login
 
 #### Alignment Data
 
-1. Download the `cognitive_biases.csv` file from [X]()
+1. Download the `cognitive_biases.csv` file from [Drive](https://docs.google.com/spreadsheets/d/1ax0yHU7FJZgiHVMg4fydDUF0ZGNxd0EQHcDyEcaa440/edit?usp=sharing)
 2. Place the file in `data/system12`
 
 #### Benchmark Data
