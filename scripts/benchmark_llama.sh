@@ -1,17 +1,18 @@
 #! /bin/bash
 cd ..
-#lm='/home/nona/experiments/simpo/lora-Meta-Llama-3-8B-Instruct-system2-6'
-#lm='meta-llama/Meta-Llama-3-8B-Instruct'
+
+# source ./venv/bin/activate
+
 SESSION_NAME="benchmark"
 screen -dmS "$SESSION_NAME" bash -c '
 gpu=(5)
-lm='/home/nona/experiments/simpo/lora-Meta-Llama-3-8B-Instruct-system1-6'
-datasets=('disability_status')
+lm='./prev_experiments/models/dpo/lora-Meta-Llama-3-8B-Instruct-system2'
+datasets=('gsm8k' 'aqua' 'addsub' 'multiarith' 'singleeq' 'commonsensqa' 'strategyqa' 'coin_flip' 'bigbench_date' 'object_tracking' 'last_letters' 'svamp')
 method='zero_shot'
-batch_size=128
+batch_size=2
 for dataset in "${datasets[@]}"; do
     echo "Running on ${dataset}"
-    CUDA_VISIBLE_DEVICES=$gpu python benchmark2.py \
+    CUDA_VISIBLE_DEVICES=$gpu python benchmark_llama.py \
                                         --limit_dataset_size=0 \
                                         --method=${method} \
                                         --model=${lm} \
