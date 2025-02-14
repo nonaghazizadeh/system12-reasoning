@@ -43,9 +43,6 @@ wandb login
 1. Download the `dataset` folder from [Role Play Prompting](https://github.com/NKU-HLT/Role-Play-Prompting)
 2. Place the folders in `data/benchmark`
 
-
-
-
 ## Running the Experiments
 
 ### Scripts for running the experiments
@@ -54,6 +51,6 @@ wandb login
 
 #### scripts/train_simpo.sh
 
+#### scripts/train_dpo_ratio.sh
 
-
-
+#### scripts/train_simpo_ratio.sh
