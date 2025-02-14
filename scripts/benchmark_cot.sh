@@ -10,7 +10,7 @@ method='zero_shot'
 batch_size=128
 for dataset in "${datasets[@]}"; do
     echo "Running on ${dataset}"
-    CUDA_VISIBLE_DEVICES=$gpu python benchmark_cot.py \
+    CUDA_VISIBLE_DEVICES=$gpu python src/benchmark_cot.py \
                                         --limit_dataset_size=0 \
                                         --method=${method} \
                                         --model=${lm} \

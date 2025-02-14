@@ -18,7 +18,7 @@ for epoch in "${epochs[@]}"; do
         SESSION_NAME="${gpu}_TRL_simpo"
         echo "[$gpu] $lm" 
         screen -dmS "$SESSION_NAME" bash -c "
-        WANDB_PROJECT=system12_simpo_ratio CUDA_VISIBLE_DEVICES=$gpu python train_simpo_mix.py \
+        WANDB_PROJECT=system12_simpo_ratio CUDA_VISIBLE_DEVICES=$gpu python src/train_simpo.py \
                                                                 --label_col "$label" \
                                                                 --LM "$lm" \
                                                                 --method "$method" \

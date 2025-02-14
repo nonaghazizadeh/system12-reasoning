@@ -161,8 +161,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-data/
+data/benchmark/
+data/bias_benchmark/
+data/instruction_tunning/
+data/processed_instruction_tunning/
 prev_experiments/
 experiments/
 wandb/
-notebooks/

@@ -19,7 +19,7 @@ for epoch in "${epochs[@]}"; do
         SESSION_NAME="${gpu}_TRL_dpo"
         echo "[$gpu] $lm" 
         screen -dmS "$SESSION_NAME" bash -c "
-        WANDB_PROJECT=system12_dpo CUDA_VISIBLE_DEVICES=$gpu python train_dpo.py \
+        WANDB_PROJECT=system12_dpo CUDA_VISIBLE_DEVICES=$gpu python src/train_dpo.py \
                                                                 --label_col "$label" \
                                                                 --LM "$lm" \
                                                                 --method "$method" \
