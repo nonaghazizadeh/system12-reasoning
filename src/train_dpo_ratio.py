@@ -26,65 +26,38 @@ def create_feedback_datasets(df, seed, label_col, train_size=0.8, data_balance="
     df_1 = df[df[label_col] == 1].reset_index(drop=True)
     df_0, df_1 = df_0[['prompt', 'Answer']], df_1[['prompt', 'Answer']]
 
+    def split_data(df_0, df_1, ratio_0, ratio_1):
+        index_0 = int(len(df_0) * ratio_0)
+        index_1 = int(len(df_1) * ratio_1)
+        df_first_part = pd.DataFrame({
+            'prompt': df_0.iloc[:index_0]['prompt'],
+            'rejected': df_1.iloc[:index_1]['Answer'],
+            'chosen': df_0.iloc[:index_0]['Answer']
+        })
+        df_second_part = pd.DataFrame({
+            'prompt': df_1.iloc[index_1:]['prompt'],
+            'rejected': df_0.iloc[index_0:]['Answer'],
+            'chosen': df_1.iloc[index_1:]['Answer']
+        })
+        return pd.concat([df_first_part, df_second_part], ignore_index=True)
+
     if data_balance == "1more":
-        quarter_index_0 = len(df_0) // 4
-        quarter_index_1 = len(df_1) // 4
-
-        df_first_quarter = pd.DataFrame({
-            'prompt': df_1.iloc[:quarter_index_1]['prompt'],
-            'rejected': df_0.iloc[:quarter_index_0]['Answer'],
-            'chosen': df_1.iloc[:quarter_index_1]['Answer']
-        })
-        df_remaining_three_quarters = pd.DataFrame({
-            'prompt': df_0.iloc[quarter_index_0:]['prompt'],
-            'rejected': df_1.iloc[quarter_index_1:]['Answer'],
-            'chosen': df_0.iloc[quarter_index_0:]['Answer']
-        })
-        df = pd.concat([df_first_quarter, df_remaining_three_quarters], ignore_index=True)
-        train_df, rest_df = train_test_split(
-            df, train_size=train_size, random_state=seed)
-        val_df, test_df = train_test_split(
-        rest_df, train_size=0.5, random_state=seed)
-
+        df = split_data(df_0, df_1, 0.25, 0.25)
     elif data_balance == "2more":
-        quarter_index_0 = len(df_0) // 4
-        quarter_index_1 = len(df_1) // 4
-
-        df_first_quarter = pd.DataFrame({
-            'prompt': df_0.iloc[:quarter_index_0]['prompt'],
-            'rejected': df_1.iloc[:quarter_index_1]['Answer'],
-            'chosen': df_0.iloc[:quarter_index_0]['Answer']
-        })
-        df_remaining_three_quarters = pd.DataFrame({
-            'prompt': df_1.iloc[quarter_index_1:]['prompt'],
-            'rejected': df_0.iloc[quarter_index_0:]['Answer'],
-            'chosen': df_1.iloc[quarter_index_1:]['Answer']
-        })
-        df = pd.concat([df_first_quarter, df_remaining_three_quarters], ignore_index=True)
-        train_df, rest_df = train_test_split(
-            df, train_size=train_size, random_state=seed)
-        val_df, test_df = train_test_split(
-            rest_df, train_size=0.5, random_state=seed)
-    
+        df = split_data(df_1, df_0, 0.25, 0.25)
     elif data_balance == "equal":
-        half_index_0 = len(df_0) // 2
-        half_index_1 = len(df_1) // 2
-
-        df_first_half = pd.DataFrame({
-            'prompt': df_0.iloc[:half_index_0]['prompt'],
-            'rejected': df_0.iloc[:half_index_0]['Answer'],
-            'chosen': df_1.iloc[:half_index_1]['Answer']
-        })
-        df_second_half = pd.DataFrame({
-            'prompt': df_0.iloc[half_index_0:]['prompt'],
-            'rejected': df_1.iloc[half_index_1:]['Answer'],
-            'chosen': df_0.iloc[half_index_0:]['Answer']
-        })
-        df = pd.concat([df_first_half, df_second_half], ignore_index=True)
-        train_df, rest_df = train_test_split(
-            df, train_size=train_size, random_state=seed)
-        val_df, test_df = train_test_split(
-            rest_df, train_size=0.5, random_state=seed)
+        df = split_data(df_0, df_1, 0.5, 0.5)
+    elif data_balance == "87.5-12.5":
+        df = split_data(df_0, df_1, 0.875, 0.125)
+    elif data_balance == "62.5-37.5":
+        df = split_data(df_0, df_1, 0.625, 0.375)
+    elif data_balance == "37.5-62.5":
+        df = split_data(df_0, df_1, 0.375, 0.625)
+    elif data_balance == "12.5-87.5":
+        df = split_data(df_0, df_1, 0.125, 0.875)
+    
+    train_df, rest_df = train_test_split(df, train_size=train_size, random_state=seed)
+    val_df, test_df = train_test_split(rest_df, train_size=0.5, random_state=seed)
 
     train_dataset = HFDataset.from_pandas(train_df)
     val_dataset = HFDataset.from_pandas(val_df)
@@ -175,6 +148,15 @@ if __name__ == "__main__":
         output_directory += "-25sys1-75sys2"
     elif args.data_balance == "equal":
         output_directory += "-50sys1-50sys2"
+    elif args.data_balance == "87.5-12.5":
+        output_directory += "-87.5-12.5"
+    elif args.data_balance == "62.5-37.5":
+        output_directory += "-62.5-37.5"
+    elif args.data_balance == "37.5-62.5":
+        output_directory += "-37.5-62.5"
+    elif args.data_balance == "12.5-87.5":
+        output_directory += "-12.5-87.5"
+        
         
     os.makedirs(output_directory, exist_ok=True)
     logger = create_logger(output_directory)
@@ -189,8 +171,7 @@ if __name__ == "__main__":
     train_dataset, val_dataset, test_dataset = create_feedback_datasets(df=df,
                                                                         seed=args.seed,
                                                                         label_col=args.label_col,
-                                                                        train_size=args.train_size,
-                                                                        reject_system_1=args.reject_system_1)
+                                                                        train_size=args.train_size)
     
     tokenizer = get_tokenizer(args.LM)
     model = get_model(args)
@@ -210,7 +191,7 @@ if __name__ == "__main__":
         report_to="wandb",
         run_name=run_name,
         save_total_limit=1,
-        beta=args.orpo_beta,
+        beta=args.dpo_beta,
         max_length=args.MAX_LEN,
         max_prompt_length=128,
     )
@@ -223,7 +204,18 @@ if __name__ == "__main__":
     )
 
     trainer.train()
+
+    # -------------- Test
+    # test_dataset = test_dataset.map(trainer.tokenize_row)
+    # res = trainer.predict(test_dataset)
+    # test_metrics = res.metrics
+    # test_metrics = {"test/"+k[5:]: v for k, v in test_metrics.items()}
+    # wandb.log(test_metrics)
+
+    # Unload model
     unload_model = trainer.model.merge_and_unload()
     
+    # Save model and tokenizer
     unload_model.save_pretrained(output_directory)
+    print("hello")
     tokenizer.save_pretrained(output_directory)
