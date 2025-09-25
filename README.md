@@ -4,7 +4,7 @@
 ## Overview
 
 <p align="center">
-  <img src="image.png" alt="pipeline" width="400">
+  <img src="sys12-iclr.png" alt="pipeline" width="400">
 </p>
 
 
