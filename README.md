@@ -92,3 +92,8 @@ The notebook generate a plot for showing the summed log probabilities of modelsâ
 
 #### src/interpretability/analysis_on_results_agg.ipynb
 The notebook generate a plot for showing the ratio of hedge words in modelsâ€™ reasoning.
+
+### Expermient 5
+
+#### scripts/benchmark_dynamic.sh
+The shell script will run the `benchmark_dynamic_no_threshol.py` to evalute our dynamic mthod on reasoning benchmarks.
