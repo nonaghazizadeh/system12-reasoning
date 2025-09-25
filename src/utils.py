@@ -422,6 +422,8 @@ class LocalDecoder():
         content = []
         for response in responses:
             content.append(response[0]['generated_text'][-1]['content'])
+        print("CONTENT................................................")
+        print(content)
         return content
 
 
@@ -489,7 +491,7 @@ def answer_cleansing(args, preds):
     #     pred = preds[-1]
     clean_preds = []
     for pred in preds:
-        if args.dataset in ("aqua", "commonsensqa"):
+        if args.dataset in ("aqua", "commonsensqa", "socialIQa", "PIQA", "com2sense"):
             pred = re.findall(r'A|B|C|D|E', pred)
         elif args.dataset == "bigbench_date":
             pred = re.findall(r'A|B|C|D|E|F', pred)

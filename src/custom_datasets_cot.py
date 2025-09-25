@@ -58,7 +58,7 @@ def data_reader(args):
                 questions.append(cot_prompt + json_res["question"].strip())
                 answers.append(json_res["answer"].split("#### ")[-1])
 
-    elif args.dataset == "commonsensqa":
+    elif args.dataset == "commonsensqa" or args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
         with open(args.dataset_path) as f:
             lines = f.readlines()
             for line in lines:

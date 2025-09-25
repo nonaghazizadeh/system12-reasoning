@@ -4,18 +4,15 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils_mistral import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
+from utils import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
 from custom_datasets import BenchmarkDataset
 from transformers import set_seed
 import re
-
-import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-os.environ['TORCH_USE_CUDA_DSA'] = '1'
-
+@torch.inference_mode
 def main():
     args = parse_arguments()
-    output_directory = os.path.join("experiments", 'mistral_new_benchmark',
+    args.model = './experiments/dpo/lora-Meta-Llama-3-8B-Instruct-system1'
+    output_directory = os.path.join("experiments", 'benchmark_dynamic',
                                     args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
     csv_file = os.path.join(output_directory, "result.csv")
@@ -26,18 +23,12 @@ def main():
     logger.info('*****************************')
     logger.info(args)
     logger.info('*****************************')
-    # print('*****************************')
-    # print(args)
-    # print('*****************************')
 
     set_seed(args.random_seed)
 
-    # print("OPENAI_API_KEY:")
-    # print(os.getenv("OPENAI_API_KEY"))
-
-    # Initialize decoder class (load model and tokenizer) ...
-    # decoder = Decoder(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("................................................")
+    print(args.model)
 
     if "instruction_tunning" in args.model:
         print()
@@ -47,7 +38,6 @@ def main():
         decoder = LocalDecoder(model_name_or_path=args.model,
                                batch_size=args.batch_size, device=device)
 
-    # print("setup data loader ...")
     logger.info("setup data loader ...")
     dataset = BenchmarkDataset(args)
  
@@ -76,9 +66,7 @@ def main():
         csv_data["pred_after"] += pred
         csv_data["GT"] += y
         pred = clean_pred(pred)
-        print(pred)
         y = clean_ans(y)
-
         correct = (np.array(pred) == np.array(y)).sum().item()
         correct_list.append(correct)
         total += len(y)
@@ -110,6 +98,22 @@ def clean_ans(answers):
         new_answers.append(new_ans)
     return new_answers
 
+
+def clean_pred(preds):
+    clean_preds = []
+    for pred in preds:
+        if '.' in pred:
+            pred = pred.rstrip('0')
+            if pred.endswith('.'):
+                pred = pred[:-1]
+
+        if '.' in pred:
+            pos = pred.find('.')
+            if len(pred) - pos - 1 > 7:
+                pred = pred[:pos + 7]
+        clean_preds.append(pred)
+    return clean_preds
+
 def extract_last_number(text):
     matches = re.findall(r'\d+\.?\d*', text)
     return matches[-1] if matches else None
@@ -132,25 +136,18 @@ def extract_last_yes_no(text):
 
 def process_text_last_letters(text):
     text = str(text)
-    text = re.sub(r"\(.*?\)", "", text)
-    match = re.search(r'["\'](.*?)["\']', text)
-    if match:
-        text = match.group(1)
-    elif "," in text:
-        text = text.split(",")[0]
-    elif ":" in text:
+    if ":" in text:
         text = text.split(":")[-1]
     elif "is" in text:
         text = text.split("is")[-1]
     return text.lower().replace("-", "").replace(" ","").replace(".","")
-
 
 def final_clean_ans(args, csv):
     if args.dataset in ["gsm8k", "multiarith", "svamp", "addsub", "singleeq"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_number)
     elif args.dataset in ["coin_flip", "strategyqa"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_yes_no)
-    elif args.dataset in ["commonsensqa", "aqua", "socialIQa", "PIQA", "com2sense"]:
+    elif args.dataset in ["commonsensqa", "aqua"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_ae)
     elif args.dataset == "bigbench_date":
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_af)
@@ -160,22 +157,6 @@ def final_clean_ans(args, csv):
         csv['pred_after'] = csv['pred_before'].astype(str).apply(process_text_last_letters)
     
     return csv
-
-def clean_pred(preds):
-    clean_preds = []
-    for pred in preds:
-        if '.' in pred:
-            pred = pred.rstrip('0')
-            if pred.endswith('.'):
-                pred = pred[:-1]
-
-        if '.' in pred:
-            pos = pred.find('.')
-            if len(pred) - pos - 1 > 7:
-                pred = pred[:pos + 7]
-        clean_preds.append(pred)
-    return clean_preds
-
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Zero-shot-CoT")
@@ -202,7 +183,7 @@ def parse_arguments():
                         help="maximum number of workers for dataloader")
 
     parser.add_argument(
-        "--model", type=str, default="meta-llama/Meta-Llama-3-8B-Instruct",
+        "--model", type=str, default="./experiments/dpo/lora-Meta-Llama-3-8B-Instruct-system1",
         help="model used for decoding."
     )
 
@@ -224,7 +205,11 @@ def parse_arguments():
     elif args.dataset == "gsm8k":
         args.dataset_path = "./data/benchmark/grade-school-math/test.jsonl"
         args.direct_answer_trigger = "\nTherefore, the answer (arabic numerals) is"
-    elif args.dataset == "commonsensqa" or args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
+    elif args.dataset == "commonsensqa":
+        args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
+        args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
+        args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."
+    elif args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
         args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
         args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
         args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."

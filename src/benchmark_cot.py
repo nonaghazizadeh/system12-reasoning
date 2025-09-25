@@ -144,7 +144,7 @@ def final_clean_ans(args, csv):
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_number)
     elif args.dataset in ["coin_flip", "strategyqa"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_yes_no)
-    elif args.dataset in ["commonsensqa", "aqua"]:
+    elif args.dataset in ["commonsensqa", "aqua", "socialIQa", "PIQA", "com2sense"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_ae)
     elif args.dataset == "bigbench_date":
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_af)
@@ -169,7 +169,7 @@ def parse_arguments():
                  "object_tracking", "coin_flip", "last_letters", 
                  "age", "disability_status", "gender_identity", 
                  "nationality", "physical_appearance", "race_ethnicity", 
-                 "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"],
+                 "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation", "socialIQa", "PIQA", "com2sense"],
         help="dataset used for experiment"
     )
 
@@ -202,7 +202,7 @@ def parse_arguments():
     elif args.dataset == "gsm8k":
         args.dataset_path = "./data/benchmark/grade-school-math/test.jsonl"
         args.direct_answer_trigger = "\nTherefore, the answer (arabic numerals) is"
-    elif args.dataset == "commonsensqa":
+    elif args.dataset == "commonsensqa" or args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
         args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
         args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
         args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."
@@ -287,7 +287,7 @@ def parse_arguments():
     elif args.dataset in ["object_tracking"]:
         args.role_setting = "From now on, you are a recorder. Alice, Bob, and Claire invite you to record a game. They will exchange their stuff in order, and you (the recorder) will fully record the whole process and tell them what they end up with."
         args.reply = "Certainly! I will act as a recorder and document the game in which Alice, Bob, and Claire will exchange their items. Please provide me with the specific order in which they will exchange their belongings, and I will keep track of the process and inform you of what each person ends up with at the end."
-    elif args.dataset in ["commonsensqa", "strategyqa"]:
+    elif args.dataset in ["commonsensqa", "strategyqa", "socialIQa", "PIQA", "com2sense"]:
         args.role_setting = "From now on, you are a contestant in the general knowledge quiz contest and always answer all kinds of common sense questions accurately. I am the moderator of the game and the final is about to start."
         args.reply = "That sounds like an exciting challenge! I'm ready to participate in the quiz contest as a contestant. Please go ahead and start the final round—I'm here to provide accurate answers to your common sense questions."
     

@@ -4,177 +4,50 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils_mistral import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
+import json
+from utils_entropy_mistral import create_logger, LocalDecoder
 from custom_datasets import BenchmarkDataset
 from transformers import set_seed
 import re
 
-import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-os.environ['TORCH_USE_CUDA_DSA'] = '1'
-
 def main():
     args = parse_arguments()
-    output_directory = os.path.join("experiments", 'mistral_new_benchmark',
+    output_directory = os.path.join("experiments", 'benchmark_entropy_mistral',
                                     args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
-    csv_file = os.path.join(output_directory, "result.csv")
-    # if os.path.exists(csv_file):
-    #     logger.info(f"CSV file {csv_file} already exists. Skipping benchmark.")
-    #     return
+
     logger = create_logger(output_directory)
     logger.info('*****************************')
     logger.info(args)
     logger.info('*****************************')
-    # print('*****************************')
-    # print(args)
-    # print('*****************************')
 
     set_seed(args.random_seed)
 
-    # print("OPENAI_API_KEY:")
-    # print(os.getenv("OPENAI_API_KEY"))
-
-    # Initialize decoder class (load model and tokenizer) ...
-    # decoder = Decoder(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if "instruction_tunning" in args.model:
-        print()
-        decoder = InstructionTunedDecoder(model_name_or_path=args.model,
-                                          batch_size=args.batch_size, device=device)
-    else:
-        decoder = LocalDecoder(model_name_or_path=args.model,
-                               batch_size=args.batch_size, device=device)
+    decoder = LocalDecoder(model_name_or_path=args.model, device=device)
 
-    # print("setup data loader ...")
     logger.info("setup data loader ...")
     dataset = BenchmarkDataset(args)
  
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=args.batch_size)
 
-    total = 0
-    correct_list = []
-    csv_data = {
-        "input": [],
-        "pred_before": [],
-        "pred_after": [],
-        "GT": [],
-    }
+    all_tokens = []
+
     for data in tqdm(dataloader):
         x, y = data
-
         x = list(x)
-        z = decoder.decode(x)
-        z2 = [temp + "\n" + temp_out + args.direct_answer_trigger for temp, temp_out in zip(x, z)]
-        pred = decoder.decode(z2)
-        csv_data["input"] += z2
-        csv_data["pred_before"] += pred
+        tokens = decoder.decode(x)
+        all_tokens.extend(tokens)
 
-        pred = answer_cleansing(args, pred)
-        csv_data["pred_after"] += pred
-        csv_data["GT"] += y
-        pred = clean_pred(pred)
-        print(pred)
-        y = clean_ans(y)
+    output_path = os.path.join(output_directory, "all_data.json")
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(all_tokens, f, ensure_ascii=False, indent=4)
 
-        correct = (np.array(pred) == np.array(y)).sum().item()
-        correct_list.append(correct)
-        total += len(y)
-
-        if (args.limit_dataset_size != 0) and ((total+1) >= args.limit_dataset_size):
-            break
-
-    accuracy = (sum(correct_list) * 1.0 / total) * 100
-    logger.info(f"accuracy : {accuracy}")
-
-    csv_data = pd.DataFrame(csv_data)
-    data = final_clean_ans(csv_data)
-    csv_data.to_csv(data, index=False)
+    logger.info(f"Saved all decoded tokens to {output_path}")
 
 
-def clean_ans(answers):
-    new_answers = []
-    for ans in answers:
-        new_ans = ""
-        for i in range(len(ans)):
-            if ans[i] == ",":
-                continue
-            new_ans += ans[i]
-
-        if '.' in new_ans:
-            pos = new_ans.find('.')
-            if len(new_ans) - pos - 1 > 7:
-                new_ans = new_ans[:pos + 7]
-        new_answers.append(new_ans)
-    return new_answers
-
-def extract_last_number(text):
-    matches = re.findall(r'\d+\.?\d*', text)
-    return matches[-1] if matches else None
-
-def extract_last_letter_in_parenthesis_af(text):
-    matches = re.findall(r'\(?(A|B|C|D|E|F)\)', text)
-    return matches[-1] if matches else None
-
-def extract_last_letter_in_parenthesis_ae(text):
-    matches = re.findall(r'\(?(A|B|C|D|E)\)', text)
-    return matches[-1] if matches else None
-
-def extract_last_letter_in_parenthesis_ac(text):
-    matches = re.findall(r'\(?(A|B|C)\)', text)
-    return matches[-1] if matches else None
-
-def extract_last_yes_no(text):
-    matches = re.findall(r'\b(?:yes|no)\b', text, re.IGNORECASE)
-    return matches[-1].lower() if matches else None
-
-def process_text_last_letters(text):
-    text = str(text)
-    text = re.sub(r"\(.*?\)", "", text)
-    match = re.search(r'["\'](.*?)["\']', text)
-    if match:
-        text = match.group(1)
-    elif "," in text:
-        text = text.split(",")[0]
-    elif ":" in text:
-        text = text.split(":")[-1]
-    elif "is" in text:
-        text = text.split("is")[-1]
-    return text.lower().replace("-", "").replace(" ","").replace(".","")
-
-
-def final_clean_ans(args, csv):
-    if args.dataset in ["gsm8k", "multiarith", "svamp", "addsub", "singleeq"]:
-        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_number)
-    elif args.dataset in ["coin_flip", "strategyqa"]:
-        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_yes_no)
-    elif args.dataset in ["commonsensqa", "aqua", "socialIQa", "PIQA", "com2sense"]:
-        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_ae)
-    elif args.dataset == "bigbench_date":
-        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_af)
-    elif args.dataset == "object_tracking":
-        csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_ac)
-    elif args.dataset == "last_letters":
-        csv['pred_after'] = csv['pred_before'].astype(str).apply(process_text_last_letters)
-    
-    return csv
-
-def clean_pred(preds):
-    clean_preds = []
-    for pred in preds:
-        if '.' in pred:
-            pred = pred.rstrip('0')
-            if pred.endswith('.'):
-                pred = pred[:-1]
-
-        if '.' in pred:
-            pos = pred.find('.')
-            if len(pred) - pos - 1 > 7:
-                pred = pred[:pos + 7]
-        clean_preds.append(pred)
-    return clean_preds
 
 
 def parse_arguments():
@@ -191,7 +64,7 @@ def parse_arguments():
                  "object_tracking", "coin_flip", "last_letters", 
                  "age", "disability_status", "gender_identity", 
                  "nationality", "physical_appearance", "race_ethnicity", 
-                 "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation", "socialIQa", "PIQA", "com2sense"],
+                 "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"],
         help="dataset used for experiment"
     )
 
@@ -224,7 +97,7 @@ def parse_arguments():
     elif args.dataset == "gsm8k":
         args.dataset_path = "./data/benchmark/grade-school-math/test.jsonl"
         args.direct_answer_trigger = "\nTherefore, the answer (arabic numerals) is"
-    elif args.dataset == "commonsensqa" or args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
+    elif args.dataset == "commonsensqa":
         args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
         args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
         args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."

@@ -6,14 +6,14 @@ cd ..
 
 SESSION_NAME="benchmark-mistral"
 screen -dmS "$SESSION_NAME" bash -c '
-gpu=(3)
-lm='./experiments/simpo/lora-Mistral-7B-Instruct-v0.3-system1'
-datasets=('PIQA')
+gpu=(0)
+lm='./experiments/dpo/lora-Mistral-7B-Instruct-v0.3-system1'
+datasets=('aqua' 'gsm8k' 'addsub' 'singleeq' 'commonsensqa' 'strategyqa' 'object_tracking' 'coin_flip' 'bigbench_date' 'svamp' 'last_letters' 'multiarith')
 method='zero_shot'
 batch_size=32
 for dataset in "${datasets[@]}"; do
     echo "Running on ${dataset}"
-    CUDA_VISIBLE_DEVICES=$gpu python src/benchmark_mistral.py \
+    CUDA_VISIBLE_DEVICES=$gpu python src/benchmark_entropy_mistral.py \
                                         --limit_dataset_size=0 \
                                         --method=${method} \
                                         --model=${lm} \

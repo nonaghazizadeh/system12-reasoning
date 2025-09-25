@@ -4,53 +4,52 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils_mistral import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
+from utils_entropy import create_logger, LocalDecoder, answer_cleansing
 from custom_datasets import BenchmarkDataset
 from transformers import set_seed
 import re
 
-import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-os.environ['TORCH_USE_CUDA_DSA'] = '1'
-
+@torch.inference_mode
 def main():
+    
     args = parse_arguments()
-    output_directory = os.path.join("experiments", 'mistral_new_benchmark',
-                                    args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
+    output_directory = os.path.join("experiments", 'dynamic', args.model, args.algorithm, args.dataset)
     os.makedirs(output_directory, exist_ok=True)
     csv_file = os.path.join(output_directory, "result.csv")
-    # if os.path.exists(csv_file):
-    #     logger.info(f"CSV file {csv_file} already exists. Skipping benchmark.")
-    #     return
     logger = create_logger(output_directory)
     logger.info('*****************************')
     logger.info(args)
     logger.info('*****************************')
-    # print('*****************************')
-    # print(args)
-    # print('*****************************')
 
     set_seed(args.random_seed)
-
-    # print("OPENAI_API_KEY:")
-    # print(os.getenv("OPENAI_API_KEY"))
-
-    # Initialize decoder class (load model and tokenizer) ...
-    # decoder = Decoder(args)
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    if "instruction_tunning" in args.model:
-        print()
-        decoder = InstructionTunedDecoder(model_name_or_path=args.model,
-                                          batch_size=args.batch_size, device=device)
+    if args.model == "llama":
+        if args.algorithm == "dpo":
+            decoder_system1 = LocalDecoder(
+                model_name_or_path="./experiments/dpo/lora-Meta-Llama-3-8B-Instruct-system1",
+                batch_size=args.batch_size, device=device
+            )
+            decoder_system2 = LocalDecoder(
+                model_name_or_path="./experiments/dpo/lora-Meta-Llama-3-8B-Instruct-system2",
+                batch_size=args.batch_size, device=device
+            )
+        elif args.algorithm == "simpo":
+            decoder_system1 = LocalDecoder(
+                model_name_or_path="./experiments/simpo/lora-Meta-Llama-3-8B-Instruct-system1",
+                batch_size=args.batch_size, device=device
+            )
+            decoder_system2 = LocalDecoder(
+                model_name_or_path="./experiments/simpo/lora-Meta-Llama-3-8B-Instruct-system2",
+                batch_size=args.batch_size, device=device
+            )
+        else:
+            raise ValueError(f"Algorithm {args.algorithm} not supported")
     else:
-        decoder = LocalDecoder(model_name_or_path=args.model,
-                               batch_size=args.batch_size, device=device)
-
-    # print("setup data loader ...")
+        raise ValueError(f"Model {args.model} not supported")
+    
     logger.info("setup data loader ...")
     dataset = BenchmarkDataset(args)
- 
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=args.batch_size)
 
@@ -61,39 +60,88 @@ def main():
         "pred_before": [],
         "pred_after": [],
         "GT": [],
+        "best_model": [],
     }
+    # dynamic evaluation
     for data in tqdm(dataloader):
         x, y = data
-
         x = list(x)
-        z = decoder.decode(x)
-        z2 = [temp + "\n" + temp_out + args.direct_answer_trigger for temp, temp_out in zip(x, z)]
-        pred = decoder.decode(z2)
-        csv_data["input"] += z2
-        csv_data["pred_before"] += pred
-
-        pred = answer_cleansing(args, pred)
-        csv_data["pred_after"] += pred
-        csv_data["GT"] += y
-        pred = clean_pred(pred)
-        print(pred)
-        y = clean_ans(y)
-
-        correct = (np.array(pred) == np.array(y)).sum().item()
-        correct_list.append(correct)
-        total += len(y)
-
-        if (args.limit_dataset_size != 0) and ((total+1) >= args.limit_dataset_size):
-            break
-
+        
+        z1 = decoder_system1.decode(x)
+        z2 = decoder_system2.decode(x)
+        # z1 and z2 are results for each batch, for each sample in the batch, we need to compare the entropy and variance entropy
+        for i in range(len(z1)):
+            entropy1 = z1[i]['sequence_entropy']
+            entropy2 = z2[i]['sequence_entropy']
+            variance_entropy1 = z1[i]['entropy_variance']
+            variance_entropy2 = z2[i]['entropy_variance']
+            best_model = None
+            # if sys1 varaince entropy is low and sys2 entropy is low and at the same time sys 2 variance entropy is low and sys2 entropy is high, then sys1 is better
+            if  0.1 < variance_entropy1 < 0.3 and 0.1 < entropy1 < 0.3 and 0.15 < variance_entropy2 < 0.45 and 0.55 < entropy2 < 0.95:
+                best_model = "sys1"
+                print("Model 1 is better")
+            elif 0.55 < variance_entropy1 < 0.85 and 0.7 < entropy1 < 0.9 and 0.1 < variance_entropy2 < 0.5 and 0.15 < entropy2 < 0.55:
+                best_model = "sys2"
+                print("Model 2 is better")
+            elif 0.7 < variance_entropy1 < 0.9 and 0.7 < entropy1 < 0.9 and 0.46 < variance_entropy2 < 0.94 and 0.46 < entropy2 < 0.94:
+                best_model = "none"
+                print("both models are wrong")
+            elif 0.05 < variance_entropy1 < 0.25 and 0.05 < entropy1 < 0.25 and 0.1 < variance_entropy2 < 0.5 and 0.1 < entropy2 < 0.5:
+                best_model = "both"
+                print("both models are correct")
+            else:
+                best_model = "edge"
+                print("edge cases")
+            print(best_model)
+            
+            if best_model == "sys1":
+                z = z1[i]['generated_text']
+            elif best_model == "sys2":
+                z = z2[i]['generated_text']
+            else:
+                # random choice
+                random_choice = np.random.randint(0, 2)
+                if random_choice == 0:
+                    best_model = "sys1"
+                    z = z1[i]['generated_text']
+                else:
+                    best_model = "sys2"
+                    z = z2[i]['generated_text']
+            print(z)
+            print("--------------------------------")
+            
+            z_final = [temp + "\n" + temp_out + args.direct_answer_trigger for temp, temp_out in zip(x, z)]
+            if best_model == "sys1":
+                pred = decoder_system1.decode(z_final)
+            elif best_model == "sys2":
+                pred = decoder_system2.decode(z_final)
+            print(pred)
+            print("--------------------------------")
+            csv_data["input"] += z_final
+            csv_data["pred_before"] += pred
+            pred = answer_cleansing(args, pred)
+            csv_data["pred_after"] += pred
+            csv_data["best_model"] += best_model
+            csv_data["GT"] += y
+            pred = clean_pred(pred)
+            y = clean_ans(y)
+            correct = (np.array(pred) == np.array(y)).sum().item()
+            correct_list.append(correct)
+            total += len(y)
+            
+            if (args.limit_dataset_size != 0) and ((total+1) >= args.limit_dataset_size):
+                break
+            
     accuracy = (sum(correct_list) * 1.0 / total) * 100
     logger.info(f"accuracy : {accuracy}")
-
     csv_data = pd.DataFrame(csv_data)
-    data = final_clean_ans(csv_data)
+    data = final_clean_ans(args, csv_data)
     csv_data.to_csv(data, index=False)
 
-
+            
+            
+            
+            
 def clean_ans(answers):
     new_answers = []
     for ans in answers:
@@ -109,6 +157,22 @@ def clean_ans(answers):
                 new_ans = new_ans[:pos + 7]
         new_answers.append(new_ans)
     return new_answers
+
+
+def clean_pred(preds):
+    clean_preds = []
+    for pred in preds:
+        if '.' in pred:
+            pred = pred.rstrip('0')
+            if pred.endswith('.'):
+                pred = pred[:-1]
+
+        if '.' in pred:
+            pos = pred.find('.')
+            if len(pred) - pos - 1 > 7:
+                pred = pred[:pos + 7]
+        clean_preds.append(pred)
+    return clean_preds
 
 def extract_last_number(text):
     matches = re.findall(r'\d+\.?\d*', text)
@@ -132,25 +196,18 @@ def extract_last_yes_no(text):
 
 def process_text_last_letters(text):
     text = str(text)
-    text = re.sub(r"\(.*?\)", "", text)
-    match = re.search(r'["\'](.*?)["\']', text)
-    if match:
-        text = match.group(1)
-    elif "," in text:
-        text = text.split(",")[0]
-    elif ":" in text:
+    if ":" in text:
         text = text.split(":")[-1]
     elif "is" in text:
         text = text.split("is")[-1]
     return text.lower().replace("-", "").replace(" ","").replace(".","")
-
 
 def final_clean_ans(args, csv):
     if args.dataset in ["gsm8k", "multiarith", "svamp", "addsub", "singleeq"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_number)
     elif args.dataset in ["coin_flip", "strategyqa"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_yes_no)
-    elif args.dataset in ["commonsensqa", "aqua", "socialIQa", "PIQA", "com2sense"]:
+    elif args.dataset in ["commonsensqa", "aqua"]:
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_ae)
     elif args.dataset == "bigbench_date":
         csv['pred_after'] = csv['pred_before'].astype(str).apply(extract_last_letter_in_parenthesis_af)
@@ -160,21 +217,6 @@ def final_clean_ans(args, csv):
         csv['pred_after'] = csv['pred_before'].astype(str).apply(process_text_last_letters)
     
     return csv
-
-def clean_pred(preds):
-    clean_preds = []
-    for pred in preds:
-        if '.' in pred:
-            pred = pred.rstrip('0')
-            if pred.endswith('.'):
-                pred = pred[:-1]
-
-        if '.' in pred:
-            pos = pred.find('.')
-            if len(pred) - pos - 1 > 7:
-                pred = pred[:pos + 7]
-        clean_preds.append(pred)
-    return clean_preds
 
 
 def parse_arguments():
@@ -207,8 +249,7 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--method", type=str, default="zero_shot",
-        choices=["zero_shot", "role_play"], help="method"
+        "--algorithm", type=str, default="dpo", help="algorithm to use"
     )
 
     parser.add_argument(
@@ -224,7 +265,11 @@ def parse_arguments():
     elif args.dataset == "gsm8k":
         args.dataset_path = "./data/benchmark/grade-school-math/test.jsonl"
         args.direct_answer_trigger = "\nTherefore, the answer (arabic numerals) is"
-    elif args.dataset == "commonsensqa" or args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
+    elif args.dataset == "commonsensqa":
+        args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
+        args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
+        args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."
+    elif args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
         args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
         args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
         args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."
@@ -314,7 +359,6 @@ def parse_arguments():
         args.reply = "That sounds like an exciting challenge! I'm ready to participate in the quiz contest as a contestant. Please go ahead and start the final round—I'm here to provide accurate answers to your common sense questions."
     
     return args
-
 
 if __name__ == "__main__":
     main()

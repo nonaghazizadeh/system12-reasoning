@@ -11,7 +11,7 @@ import re
 @torch.inference_mode
 def main():
     args = parse_arguments()
-    output_directory = os.path.join("experiments", 'prob_benchmark',
+    output_directory = os.path.join("experiments", 'new_benchmark',
                                     args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
     csv_file = os.path.join(output_directory, "result.csv")
@@ -26,6 +26,8 @@ def main():
     set_seed(args.random_seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("................................................")
+    print(args.model)
 
     if "instruction_tunning" in args.model:
         print()
@@ -169,7 +171,7 @@ def parse_arguments():
                  "object_tracking", "coin_flip", "last_letters", 
                  "age", "disability_status", "gender_identity", 
                  "nationality", "physical_appearance", "race_ethnicity", 
-                 "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation"],
+                 "race_x_gender", "race_x_ses", "religion", "ses", "sexual_orientation", "socialIQa", "PIQA", "com2sense"],
         help="dataset used for experiment"
     )
 
@@ -203,6 +205,10 @@ def parse_arguments():
         args.dataset_path = "./data/benchmark/grade-school-math/test.jsonl"
         args.direct_answer_trigger = "\nTherefore, the answer (arabic numerals) is"
     elif args.dataset == "commonsensqa":
+        args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
+        args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
+        args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."
+    elif args.dataset == "socialIQa" or args.dataset == "PIQA" or args.dataset == "com2sense":
         args.dataset_path = "./data/benchmark/CommonsenseQA/dev_rand_split.jsonl"
         args.direct_answer_trigger = "\nTherefore, among A through E, the answer is"
         args.plausible_answer_trigger = "Choose the most plausible answer from among choices A through E."
