@@ -8,17 +8,9 @@ Official code, data, raw analysis artifacts, and reproducibility instructions fo
 COLM 2026 paper **“Reasoning on a Spectrum: Aligning LLMs to System 1 and System 2
 Thinking.”**
 
-Alireza S. Ziabari\*, Nona Ghazizadeh\*, Zhivar Sourati,
-Farzan Karimi-Malekabadi, Payam Piray, and Morteza Dehghani
-University of Southern California · \*Equal contribution
-
 <p align="center">
   <img src="sys12-iclr.png" alt="System 1/System 2 alignment and entropy-guided arbitration pipeline" width="1000">
 </p>
-
-The released figure above is the overview used as Figure 1 in the paper: paired System 1
-and System 2 answers create opposite preference objectives, and a training-free router
-selects between the aligned models using early-generation entropy.
 
 ## What this repository reproduces
 
@@ -34,10 +26,6 @@ The artifact covers the paper's complete experimental pipeline:
    reliability-score weight `w = 0.4`.
 7. Llama 3B/8B/70B, Mistral 7B, and DeepSeek-R1-Distill-Qwen-1.5B results reported in
    the paper.
-
-The supported camera-ready entry points are `src/train_alignment.py`, `src/evaluate.py`,
-and `src/evaluate_dynamic.py`. Earlier cluster-specific launch scripts are retained as an
-audit trail but are not required for reproduction.
 
 ## Main findings
 
@@ -69,15 +57,6 @@ Mistral, and DeepSeek table is in [`results/paper_results.csv`](results/paper_re
 | **Dynamic** | **DPO** | **98.9** | **79.2** | **88.1** | **48.9** | **93.6** | **84.8** | **31.8** | **94.6** | **86.0** | **71.9** | **69.8** | **79.3** | **83.7** | **72.2** |
 | **Dynamic** | **SimPO** | **97.6** | **79.2** | **88.9** | **54.5** | **93.0** | **81.3** | **30.8** | **94.2** | **84.4** | **71.6** | **68.2** | **80.1** | **83.2** | **71.7** |
 
-Category-level macro averages make the trade-off especially clear:
-
-| Llama-3-8B variant | Arithmetic (7) | Symbolic (2) | Commonsense (5) | Overall (14) |
-|---|---:|---:|---:|---:|
-| Base | 72.70 | 89.20 | 74.46 | 75.69 |
-| System 2 DPO | **75.71** | **90.50** | 71.56 | 76.34 |
-| System 1 DPO | 69.40 | 88.50 | **75.40** | 74.27 |
-| Dynamic DPO | 75.04 | 90.30 | 75.38 | **77.34** |
-
 ## Repository layout
 
 ```text
@@ -99,10 +78,6 @@ Category-level macro averages make the trade-off especially clear:
 │   └── interpretability/          # raw generations, probabilities, notebooks
 └── tests/                         # data, scoring, and routing regression tests
 ```
-
-`experiments/`, W&B logs, model weights, and third-party benchmark copies are ignored.
-Training now saves LoRA adapters rather than merged full-model checkpoints, which keeps
-the endpoints small and makes the paper's Multi-LoRA dynamic serving path possible.
 
 ## 1. Environment
 
@@ -170,13 +145,9 @@ The training file is [`data/system12/cogbias.csv`](data/system12/cogbias.csv):
 - 2,000 unique questions
 - exactly one System 1 and one System 2 answer per question
 - columns: `Question`, `Answer`, `Strategy`
-- SHA-256: `11d54bc2f140f42bc937eb996d57de727c3fca85b9534f832820f105093cb458`
 
 The trainer validates complete pairs before splitting. The split is prompt-disjoint and
 uses 80% (1,600 questions) for training and 20% (400 questions) for validation.
-
-`data/system12/cogbias_sys12_after.csv` is an earlier/intermediate processing artifact and
-is not the default camera-ready training input.
 
 ### Evaluation data
 
@@ -193,8 +164,7 @@ If `data/benchmark` already contains an older local copy:
 python scripts/prepare_benchmarks.py --force
 ```
 
-The command writes `data/benchmark/MANIFEST.json` with source commits, counts, and
-SHA-256 hashes. Expected evaluation sizes are:
+The command writes `data/benchmark/MANIFEST.json` with source commits and counts. Expected evaluation sizes are:
 
 | Category | Benchmark | Split/examples |
 |---|---|---:|
@@ -436,6 +406,7 @@ sampled items from each benchmark, the first `n ∈ {1, 3, 6, 9, 12, 15}` senten
 solved demonstrations. The exact prompt is reproduced in the paper; cached annotation
 outputs are under `src/interpretability/`.
 
+<!--
 ## 8. Validation and expected checks
 
 Run the lightweight regression suite before launching GPUs:
@@ -472,19 +443,8 @@ traceability is required.
 | Figures 5, 11, and 12: router validation | no additional training | dynamic metrics, `w`/`n` sweeps |
 | Appendix K: unnormalized-length ablation | train with the archived unnormalized dataset variant | same two-stage evaluator |
 | Appendix L: voice-normalization ablation | train with the corresponding archived normalized variant | same two-stage evaluator |
-
-## Known scope and artifact policy
-
-- Model weights are not committed to git. Publish LoRA adapters separately (for example on
-  Hugging Face) and add immutable links here if redistribution is permitted.
-- Third-party benchmark data is downloaded from pinned sources and remains under upstream
-  licenses.
-- `experiments/` and W&B logs are ignored because the local workspace contains hundreds
-  of gigabytes of full checkpoints; they must never be pushed to ordinary GitHub storage.
-- The released alignment data contains no personally identifiable information. System 1
-  models deliberately use heuristic shortcuts and should not be deployed in high-stakes
-  settings without safeguards.
-
+-->
+<!--
 ## Citation
 
 ```bibtex
@@ -499,7 +459,7 @@ traceability is required.
 
 Preprint: [arXiv:2502.12470](https://arxiv.org/abs/2502.12470) ·
 [COLM 2026 accepted-paper list](https://colm.eventhosts.cc/Conferences/2026/AcceptedPapers)
-
+-->
 ## License
 
 Code and original repository materials are released under the
