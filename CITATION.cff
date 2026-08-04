@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this dataset or code, please cite the COLM 2026 paper."
+title: "Reasoning on a Spectrum: Aligning LLMs to System 1 and System 2 Thinking"
+type: software
+license: Apache-2.0
+authors:
+  - family-names: Ziabari
+    given-names: Alireza S.
+  - family-names: Ghazizadeh
+    given-names: Nona
+  - family-names: Sourati
+    given-names: Zhivar
+  - family-names: Karimi-Malekabadi
+    given-names: Farzan
+  - family-names: Piray
+    given-names: Payam
+  - family-names: Dehghani
+    given-names: Morteza
+repository-code: "https://github.com/nonaghazizadeh/reasoning-on-a-spectrum"
+url: "https://arxiv.org/abs/2502.12470"
+preferred-citation:
+  type: conference-paper
+  title: "Reasoning on a Spectrum: Aligning LLMs to System 1 and System 2 Thinking"
+  authors:
+    - family-names: Ziabari
+      given-names: Alireza S.
+    - family-names: Ghazizadeh
+      given-names: Nona
+    - family-names: Sourati
+      given-names: Zhivar
+    - family-names: Karimi-Malekabadi
+      given-names: Farzan
+    - family-names: Piray
+      given-names: Payam
+    - family-names: Dehghani
+      given-names: Morteza
+  collection-title: "Conference on Language Modeling (COLM)"
+  year: 2026

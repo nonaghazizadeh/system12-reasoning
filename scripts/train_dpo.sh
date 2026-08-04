@@ -6,10 +6,10 @@ label='labels'
 method='lora'
 epochs=(5)
 learning_rate=5e-14
-gpus=(0)
+gpus=(6)
 eval_steps=100
-#LM=('meta-llama/Meta-Llama-3-8B-Instruct')
-LM=('mistralai/Mistral-7B-Instruct-v0.3')
+LM=('meta-llama/Llama-3.2-3B-Instruct')
+# LM=('mistralai/Mistral-7B-Instruct-v0.3')
 dataset_name="system12_combined"
 
 for epoch in "${epochs[@]}"; do

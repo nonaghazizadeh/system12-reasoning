@@ -1,26 +1,22 @@
 #! /bin/bash
 cd ..
 
-# source ./venv/bin/activate
-#datasets=('PIQA' 'socialIQa' 'com2sense')
+
 SESSION_NAME="benchmark"
 screen -dmS "$SESSION_NAME" bash -c '
-gpu=(6)
-lm='./experiments/dpo/lora-Meta-Llama-3-8B-Instruct-system1'
+gpu=(7)
+lm='./experiments/dpo/lora-Meta-Llama-3-8B-Instruct-system2'
 # lm='meta-llama/Meta-Llama-3-8B-Instruct'
-datasets=('gsm8k' 'aqua' 'addsub' 'multiarith' 'singleeq' 'commonsensqa' 'strategyqa' 'coin_flip' 'bigbench_date' 'object_tracking' 'last_letters' 'svamp')
-#datasets=('coin_flip')
-seed=9
-method='role_play'
+datasets=('math500')
+method='zero_shot'
 batch_size=32
 for dataset in "${datasets[@]}"; do
     echo "Running on ${dataset}"
-    CUDA_VISIBLE_DEVICES=$gpu python src/benchmark_llama.py \
+    CUDA_VISIBLE_DEVICES=$gpu python src/benchmark_llama_math.py \
                                         --limit_dataset_size=0 \
                                         --method=${method} \
                                         --model=${lm} \
                                         --batch_size ${batch_size} \
-                                        --random_seed=${seed} \
                                         --dataset=${dataset} ;                      
 done
 exit'

@@ -4,11 +4,11 @@ cd ..
 # source ./venv/bin/activate
 
 SESSION_NAME="benchmark"
-# screen -dmS "$SESSION_NAME" bash -c '
-gpu=(1)
-datasets=('addsub')
-model='llama'
-algorithm='dpo'
+screen -dmS "$SESSION_NAME" bash -c '
+gpu=(6)
+datasets=('aqua' 'gsm8k' 'addsub' 'singleeq' 'commonsensqa' 'strategyqa' 'object_tracking' 'coin_flip' 'bigbench_date' 'svamp' 'last_letters' 'multiarith')
+model='llama3b'
+algorithm='simpo'
 batch_size=16
 for dataset in "${datasets[@]}"; do
     echo "Running on ${dataset}"
@@ -19,4 +19,4 @@ for dataset in "${datasets[@]}"; do
                                         --batch_size ${batch_size} \
                                         --dataset=${dataset} ;                      
 done
-# exit'
+exit'

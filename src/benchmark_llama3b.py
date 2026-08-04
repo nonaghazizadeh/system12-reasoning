@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from utils import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
+from utils_3b import create_logger, LocalDecoder, answer_cleansing, InstructionTunedDecoder
 from custom_datasets import BenchmarkDataset
 from transformers import set_seed
 import re
@@ -14,7 +14,7 @@ def main():
     output_directory = os.path.join("experiments", 'benchmark',
                                     args.model.split("/")[-2], args.model.split("/")[-1], args.dataset)
     os.makedirs(output_directory, exist_ok=True)
-    csv_file = os.path.join(output_directory, f"result_seed{args.random_seed}.csv")
+    csv_file = os.path.join(output_directory, "result.csv")
     # if os.path.exists(csv_file):
     #     logger.info(f"CSV file {csv_file} already exists. Skipping benchmark.")
     #     return
@@ -77,8 +77,8 @@ def main():
     logger.info(f"accuracy : {accuracy}")
 
     csv_data = pd.DataFrame(csv_data)
-    csv_data = final_clean_ans(args, csv_data)
-    csv_data.to_csv(csv_file, index=False)
+    data = final_clean_ans(csv_data)
+    csv_data.to_csv(data, index=False)
 
 
 def clean_ans(answers):

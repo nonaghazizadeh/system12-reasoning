@@ -49,6 +49,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.ruff_cache/
 cover/
 
 # Translations
@@ -169,3 +170,4 @@ data/system12/
 prev_experiments/
 experiments/
 wandb/
+.DS_Store

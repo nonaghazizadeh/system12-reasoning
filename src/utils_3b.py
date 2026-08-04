@@ -385,20 +385,9 @@ def get_pipeline(model_name_or_path, device):
         )
     else:
         model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
+            "meta-llama/Llama-3.2-3B-Instruct",
         )
-    print("TOKENIZER................................................")
-    print(tokenizer)
-    print(".............................")
-    print(model)
-    print(".............................")
     tokenizer, model = add_pad_token_id(tokenizer, model)
-
-    print(tokenizer.pad_token_id)
-    print(".............................")
-    print(model.config.pad_token_id)
-    print(".............................")
-
     pipe = pipeline(
         "text-generation",
         model=model,
@@ -408,7 +397,7 @@ def get_pipeline(model_name_or_path, device):
 
 
 class LocalDecoder():
-    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=1024):
+    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
         self.pipeline = get_pipeline(model_name_or_path, device)
         # self.batch_size = batch_size
         self.MAX_LEN = MAX_LEN
@@ -423,8 +412,6 @@ class LocalDecoder():
         # conversation = [{"role": "user", "content": input}]
         responses = self.pipeline(conversations,
                                   max_new_tokens=self.MAX_LEN,
-                                  output_scores = True,
-                                  repetition_penalty=1.2
                                   #  batch_size=self.batch_size,
                                   #  padding='longest'
                                   )
@@ -437,9 +424,9 @@ class LocalDecoder():
 
 
 class InstructionTunedDecoder():
-    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=1024):
+    def __init__(self, model_name_or_path, device, batch_size, MAX_LEN=256):
         model_name_or_path = model_name_or_path + "/best_model"
-        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
+        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B-Instruct")
         peft_config = PeftConfig.from_pretrained(model_name_or_path)
 
         model = AutoModelForCausalLM.from_pretrained(
@@ -462,7 +449,6 @@ class InstructionTunedDecoder():
         # conversation = [{"role": "user", "content": input}]
         responses = self.pipeline(conversations,
                                   max_new_tokens=self.MAX_LEN,
-                                  repetition_penalty=1.2
                                   #  batch_size=self.batch_size,
                                   #  padding='longest'
                                   )
@@ -507,8 +493,6 @@ def answer_cleansing(args, preds):
             pred = re.findall(r'A|B|C|D|E|F', pred)
         elif args.dataset in ("object_tracking"):
             pred = re.findall(r'A|B|C', pred)
-        elif args.dataset == "math500" or args.dataset == "agieval":
-            pred = re.findall(r'\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}', pred)
         elif args.dataset in ("gsm8k", "addsub", "multiarith", "svamp", "singleeq"):
             pred = pred.replace(",", "")
             pred = [s for s in re.findall(r'-?\d+\.?\d*', pred)]
