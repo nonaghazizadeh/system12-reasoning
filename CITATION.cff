@@ -16,7 +16,7 @@ authors:
     given-names: Payam
   - family-names: Dehghani
     given-names: Morteza
-repository-code: "https://github.com/nonaghazizadeh/reasoning-on-a-spectrum"
+repository-code: "https://github.com/nonaghazizadeh/system12-reasoning"
 url: "https://arxiv.org/abs/2502.12470"
 preferred-citation:
   type: conference-paper
