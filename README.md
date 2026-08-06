@@ -41,21 +41,13 @@ The artifact covers the paper's complete experimental pipeline:
   training. For Llama-3-8B, DPO-dynamic improves over the base model on all 14 benchmarks;
   SimPO-dynamic improves on 12.
 
-### Llama-3-8B main results
+### Main results
 
-Exact-match accuracy (%). These are the 8B rows from Table 1; the complete 3B, 8B, 70B,
-Mistral, and DeepSeek table is in [`results/paper_results.csv`](results/paper_results.csv).
+Exact-match accuracy (%) across the 14 benchmarks. This is Table 1 from the paper,
+including the complete Llama-3 3B, 8B, and 70B results. A machine-readable transcription
+is available in [`results/paper_results.csv`](results/paper_results.csv).
 
-| Model | Alg. | MultiArith | GSM8K | AddSub | AQuA | SingleEq | SVAMP | AGIEval | Coin | Letter | CSQA | StrategyQA | PIQA | SIQA | COM2SENSE |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Base | — | 97.7 | 78.5 | 82.5 | 48.8 | 90.7 | 80.5 | 30.2 | 94.4 | 84.0 | 71.4 | 67.6 | 79.0 | 83.2 | 71.1 |
-| CoT | — | 97.8 | 78.5 | 82.0 | 49.2 | 88.2 | 80.9 | 30.4 | 94.8 | 84.2 | 71.6 | 67.4 | 79.9 | 83.3 | 70.9 |
-| System 2 | DPO | 98.7 | 79.4 | 89.9 | 49.2 | 94.4 | 85.4 | 33.0 | 94.8 | 86.2 | 71.4 | 60.9 | 76.4 | 81.2 | 67.9 |
-| System 2 | SimPO | 97.8 | 79.4 | 90.1 | 54.7 | 94.5 | 81.7 | 32.6 | 94.4 | 84.8 | 69.6 | 67.4 | 78.2 | 81.5 | 69.2 |
-| System 1 | DPO | 98.5 | 77.0 | 80.8 | 46.5 | 77.2 | 78.0 | 27.8 | 93.2 | 83.8 | 72.8 | 68.2 | 79.9 | 83.9 | 72.2 |
-| System 1 | SimPO | 97.5 | 77.8 | 80.5 | 48.0 | 87.4 | 79.3 | 28.4 | 94.0 | 83.8 | 72.3 | 67.7 | 81.5 | 83.4 | 71.7 |
-| Dynamic | DPO | 98.9 | 79.2 | 88.1 | 48.9 | 93.6 | 84.8 | 31.8 | 94.6 | 86.0 | 71.9 | 69.8 | 79.3 | 83.7 | 72.2 |
-| Dynamic | SimPO | 97.6 | 79.2 | 88.9 | 54.5 | 93.0 | 81.3 | 30.8 | 94.2 | 84.4 | 71.6 | 68.2 | 80.1 | 83.2 | 71.7 |
+![Table 1: Accuracy comparison of System 1, System 2, and Dynamic Llama-3 models.](assets/table1_main_results.png)
 
 ## Repository layout
 
