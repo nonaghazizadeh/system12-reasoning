@@ -81,20 +81,6 @@ Mistral, and DeepSeek table is in [`results/paper_results.csv`](results/paper_re
 
 ## 1. Environment
 
-### Tested system
-
-- Ubuntu Linux
-- Python 3.10.12
-- CUDA 12.1
-- PyTorch 2.4.0
-- Transformers 4.46.3
-- PEFT 0.12.0
-- TRL 0.12.1
-- NVIDIA RTX A6000 (48 GB) and NVIDIA H200 (140 GB)
-
-The complete study used approximately 1,500 GPU hours. A single 8B reproduction is much
-smaller, but the full 3B/8B/70B × DPO/SimPO × mixture grid remains compute intensive.
-
 Create the environment:
 
 ```bash
